@@ -55,15 +55,27 @@ jobs:
       - name: Start the Android emulator
         run: |
           sudo chmod 666 /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -version
+          "$ANDROID_HOME/emulator/emulator" -accel-check
           echo no | avdmanager create avd --name next-step-test --package "system-images;android-35;google_apis;x86_64" --device pixel_6 --force
-          "$ANDROID_HOME/emulator/emulator" -avd next-step-test -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          timeout 180 adb wait-for-device
+          adb start-server
+          # Use the current supported software renderer; *_indirect modes are deprecated.
+          QT_QPA_PLATFORM=offscreen "$ANDROID_HOME/emulator/emulator" -avd next-step-test -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
           booted=false
-          for attempt in $(seq 1 120); do
-            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then booted=true; break; fi
+          boot_deadline=$((SECONDS + 300))
+          while [ "$SECONDS" -lt "$boot_deadline" ]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then
+              echo "::error::The Android emulator exited before boot completed."
+              cat "$RUNNER_TEMP/emulator.log"
+              exit 1
+            fi
+            boot_status="$(timeout 5 adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+            if [ "$boot_status" = "1" ]; then booted=true; break; fi
             sleep 2
           done
           [ "$booted" = true ] || { cat "$RUNNER_TEMP/emulator.log"; exit 1; }
+          adb devices -l
           adb shell input keyevent 82
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
@@ -92,4 +104,17 @@ jobs:
           path: |
             android/app/build/reports/
             android/app/build/outputs/androidTest-results/
+          retention-days: 14
+      - name: Capture emulator diagnostics
+        if: always()
+        run: timeout 10 adb -s emulator-5554 logcat -d -t 2000 > "$RUNNER_TEMP/android-logcat.txt" 2>&1 || true
+      - name: Upload emulator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-emulator-diagnostics
+          path: |
+            ${{ runner.temp }}/emulator.log
+            ${{ runner.temp }}/android-logcat.txt
+          if-no-files-found: warn
           retention-days: 14
