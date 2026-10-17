@@ -67,7 +67,14 @@ jobs:
           sudo chmod 666 /dev/kvm
           "$ANDROID_HOME/emulator/emulator" -version
           "$ANDROID_HOME/emulator/emulator" -accel-check
-          echo no | avdmanager create avd --name next-step-test --package "system-images;android-35;google_apis;x86_64" --device pixel_6 --force
+          # Older avdmanager and newer emulator disagree on the default user folder.
+          # Give both tools an explicit shared AVD directory and fail early if absent.
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/android-avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+          echo no | avdmanager create avd --name next-step-test --path "$ANDROID_AVD_HOME/next-step-test.avd" --package "system-images;android-35;google_apis;x86_64" --device pixel_6 --force
+          test -f "$ANDROID_AVD_HOME/next-step-test.ini"
+          "$ANDROID_HOME/emulator/emulator" -list-avds
           adb start-server
           # Use the current supported software renderer; *_indirect modes are deprecated.
           QT_QPA_PLATFORM=offscreen "$ANDROID_HOME/emulator/emulator" -avd next-step-test -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -gpu software -memory 2048 -cores 2 > "$RUNNER_TEMP/emulator.log" 2>&1 &
