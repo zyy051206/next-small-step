@@ -37,6 +37,29 @@
   function week(sessions, now = Date.now()) {
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - 6 + i); const key = dayKey(d); return { key, date: d, seconds: sessions.filter(s => dayKey(s.finishedAt) === key).reduce((sum, s) => sum + s.seconds, 0) }; });
   }
-  const api = { key, initial, id, remaining, validate, dayKey, week };
+  // Group the original history by local calendar month; never trim saved sessions.
+  function annual(sessions, year = new Date().getFullYear()) {
+    const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, seconds: 0, count: 0, activeDays: 0 }));
+    const days = months.map(() => new Set());
+    for (const session of sessions) {
+      const date = new Date(session.finishedAt);
+      if (date.getFullYear() !== year || session.seconds <= 0) continue;
+      const index = date.getMonth(), month = months[index];
+      month.seconds += session.seconds;
+      month.count += 1;
+      days[index].add(dayKey(date));
+    }
+    months.forEach((month, i) => { month.activeDays = days[i].size; });
+    return { year, months, seconds: months.reduce((n, m) => n + m.seconds, 0), count: months.reduce((n, m) => n + m.count, 0), activeDays: months.reduce((n, m) => n + m.activeDays, 0) };
+  }
+  function focusYears(sessions, now = Date.now()) {
+    const current = new Date(now).getFullYear(), years = new Set([current]);
+    for (const session of sessions) {
+      const year = new Date(session.finishedAt).getFullYear();
+      if (Number.isInteger(year) && year <= current) years.add(year);
+    }
+    return [...years].sort((a, b) => a - b);
+  }
+  const api = { key, initial, id, remaining, validate, dayKey, week, annual, focusYears };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.StepCore = api;
 })(globalThis);

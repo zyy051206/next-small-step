@@ -4,3 +4,11 @@ node_modules/
 .openai/
 .env
 .env.*
+android/.gradle/
+android/**/build/
+android/artifacts/
+android/local.properties
+.android-signing/
+*.jks
+*.keystore
+*.apk

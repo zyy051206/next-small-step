@@ -94,6 +94,7 @@
       const col = text('div', '', `day${i === 6 ? ' today' : ''}`), bar = text('div', '', 'day-bar'); bar.style.height = `${Math.max(3, d.seconds / max * 58)}px`;
       col.title = `${d.key}：${Math.floor(d.seconds / 60)} 分 ${Math.floor(d.seconds % 60)} 秒`; col.setAttribute('aria-label', col.title); col.append(bar, text('span', i === 6 ? '今天' : `${d.date.getMonth() + 1}/${d.date.getDate()}`)); $('week-chart').append(col);
     }
+    StepStats.render(state.sessions);
     $('history-list').replaceChildren();
     if (!state.sessions.length) $('history-list').append(text('p', '还没有专注记录。第一段属于自己的时间，会从这里开始。', 'history-empty'));
     for (const s of [...state.sessions].sort((a, b) => b.finishedAt - a.finishedAt).slice(0, 8)) {
@@ -131,11 +132,23 @@
     if (state.timer?.status === 'running' && C.remaining(state.timer) <= 0) { const end = state.timer.endsAt; settleSession(end); save(); render(); toast('这一段专注结束了。喝口水，再决定下一小步。'); }
     else drawTimer();
   }
-  function download(contents, name) { const blob = new Blob([contents], { type: 'application/json;charset=utf-8' }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 15000); }
+  function download(contents, name) {
+    if (window.NextStepAndroid?.saveBackup) {
+      try { window.NextStepAndroid.saveBackup(contents, name); toast('请选择备份的保存位置。'); }
+      catch { toast('暂时无法打开保存窗口，请稍后重试。'); }
+      return;
+    }
+    const blob = new Blob([contents], { type: 'application/json;charset=utf-8' }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 15000);
+    toast('备份已生成，请保存在你找得到的地方。');
+  }
+  window.addEventListener('nextstep-backup-result', event => {
+    const status = event.detail?.status;
+    toast(status === 'success' ? '备份已保存，可以用它迁移到其他设备。' : status === 'cancelled' ? '已取消保存，当前数据没有改变。' : '备份未能保存，请检查保存位置后重试。');
+  });
   $('export-data').onclick = () => {
     tick();
-    if (storageBlocked) { try { const raw = localStorage.getItem(C.key); if (raw) { download(raw, `下一小步-原始数据-${C.dayKey(Date.now())}.json`); toast('已导出原始数据，方便恢复排查。'); return; } } catch {} }
-    download(JSON.stringify(state, null, 2), `下一小步-备份-${C.dayKey(Date.now())}.json`); toast('备份已生成，请保存在你找得到的地方。');
+    if (storageBlocked) { try { const raw = localStorage.getItem(C.key); if (raw) { download(raw, `下一小步-原始数据-${C.dayKey(Date.now())}.json`); return; } } catch {} }
+    download(JSON.stringify(state, null, 2), `下一小步-备份-${C.dayKey(Date.now())}.json`);
   };
   $('import-data').onclick = () => { if (state.timer) { toast('请先完成或重置当前计时，再导入备份。'); return; } $('import-file').click(); };
   $('import-file').onchange = async e => {
@@ -149,6 +162,12 @@
   // A second tab must load the latest state rather than silently overwrite it.
   window.addEventListener('storage', e => { if (e.key !== C.key) return; try { state = e.newValue ? C.validate(JSON.parse(e.newValue)) : C.initial(); storageBlocked = false; $('storage-warning').hidden = true; document.querySelectorAll('dialog[open]').forEach(d => d.close()); render(); toast('已同步另一个标签页的进度。'); } catch { storageBlocked = true; warning('另一个标签页写入的数据无法读取，请先导出备份。'); } });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { tick(); renderStats(); } });
+  window.addEventListener('nextstep-resume', () => { tick(); renderStats(); });
+  if (window.NextStepAndroid) {
+    document.querySelector('.privacy').lastChild.textContent = '只存在这台设备里';
+    const dataHelp = document.querySelector('.guide-list li:last-child p');
+    dataHelp.textContent = '安卓应用数据保存在本机，电脑网页和手机不会自动同步。使用导出、导入备份迁移记录；卸载应用会清除本机数据。切到后台或锁屏后仍按时钟计算，回到应用时补记已结束的计时；不会在后台发出到时通知。';
+  }
   $('today-label').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + '  /  A FRESH START';
   render(); tick(); setInterval(tick, 1000);
 })();

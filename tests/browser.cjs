@@ -83,6 +83,71 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
   assert(await ev("document.querySelector('#stat-minutes').textContent==='10' && document.querySelectorAll('.step-item').length===3"), 'backup restoration round trip');
   await ev("document.querySelector('.goal-delete').click();document.querySelector('#confirm-yes').click()"); await delay(50);
   assert(await ev("document.querySelectorAll('.goal-item').length===0 && document.querySelector('#stat-minutes').textContent==='10'"), 'deleting goal preserves focus history');
+
+  // Import a version-one fixture through the real file picker; only this isolated profile is changed.
+  const annualFixture = await ev(`(() => {
+    const year = new Date().getFullYear();
+    let leapYear = year;
+    while (new Date(leapYear, 1, 29).getMonth() !== 1) leapYear--;
+    const at = (id, y, month, day, hour, minute, seconds) => ({ id, goalTitle: '年度统计测试', stepTitle: '保留真实历史格式', finishedAt: new Date(y, month - 1, day, hour, minute).getTime(), seconds });
+    const data = StepCore.initial();
+    data.sessions = [
+      at('annual-jan-a', year, 1, 5, 0, 5, 600),
+      at('annual-jan-b', year, 1, 5, 23, 55, 300),
+      at('annual-mar', year, 3, 1, 0, 5, 1200),
+      at('annual-dec', year - 1, 12, 31, 23, 55, 1800),
+      at('annual-feb', year - 1, 2, 28, 12, 0, 600),
+      at('annual-leap-a', leapYear, 2, 29, 0, 5, 600),
+      at('annual-leap-b', leapYear, 2, 29, 23, 55, 300)
+    ];
+    return { year, leapYear, data };
+  })()`);
+  const annualBackup = path.join(qa, 'annual-v1.json');
+  fs.writeFileSync(annualBackup, JSON.stringify(annualFixture.data));
+  await inputFile(annualBackup);
+  assert(await ev("document.querySelector('#confirm-dialog').open && JSON.parse(localStorage.getItem(StepCore.key)).sessions.length===1"), 'annual backup import requires confirmation before changing existing records');
+  await ev("document.querySelector('#confirm-yes').click()"); await delay(50);
+  assert(await ev("JSON.parse(localStorage.getItem(StepCore.key)).version===1 && JSON.parse(localStorage.getItem(StepCore.key)).sessions.length===7 && document.querySelector('#stat-minutes').textContent==='90'"), 'version-one import retains multi-year history and lifetime focus total');
+  assert(await ev("!document.querySelector('#annual-stats').hidden && document.querySelector('#weekly-stats').hidden && document.querySelectorAll('#annual-chart .month-column').length===12 && document.querySelectorAll('#monthly-table-body tr').length===12 && document.querySelectorAll('#monthly-table-total tr').length===1"), 'annual view defaults to twelve month columns, twelve rows and one annual total');
+  const currentIsLeap = annualFixture.year === annualFixture.leapYear;
+  const currentMinutes = currentIsLeap ? 50 : 35, currentCount = currentIsLeap ? 5 : 3, currentDays = currentIsLeap ? 3 : 2;
+  assert(await ev(`document.querySelector('#focus-year').value==='${annualFixture.year}' && document.querySelector('#annual-duration').textContent==='${currentMinutes} 分' && [...document.querySelector('#monthly-table-total tr').children].map(n=>n.textContent).join('|')==='全年合计|${currentMinutes} 分|${currentCount} 次|${currentDays} 天'`), 'current-year summary and total count all local months and deduplicate active dates');
+  assert(await ev("[...document.querySelectorAll('#monthly-table-body tr')[0].children].map(n=>n.textContent).join('|')==='1 月|15 分|2 次|1 天' && [...document.querySelectorAll('#monthly-table-body tr')[2].children].map(n=>n.textContent).join('|')==='3 月|20 分|1 次|1 天'"), 'monthly detail separates local January and March and merges same-day activity');
+  await ev("document.querySelector('#stats-week-view').click()");
+  assert(await ev("!document.querySelector('#weekly-stats').hidden && document.querySelector('#annual-stats').hidden && document.querySelector('#stats-week-view').getAttribute('aria-pressed')==='true' && document.querySelectorAll('#week-chart .day').length===7"), 'recent-seven-days view remains available with correct selected state');
+  await ev("document.querySelector('#stats-year-view').click()");
+  assert(await ev("!document.querySelector('#annual-stats').hidden && document.querySelector('#weekly-stats').hidden && document.querySelector('#stats-year-view').getAttribute('aria-pressed')==='true' && document.querySelector('#year-next').disabled"), 'returning to year view preserves current-year upper navigation boundary');
+  await ev("document.querySelector('#year-prev').click()");
+  const previousIsLeap = annualFixture.year - 1 === annualFixture.leapYear;
+  assert(await ev(`document.querySelector('#focus-year').value==='${annualFixture.year - 1}' && document.querySelector('#annual-duration').textContent==='${previousIsLeap ? 55 : 40} 分' && [...document.querySelectorAll('#monthly-table-body tr')[11].children].map(n=>n.textContent).join('|')==='12 月|30 分|1 次|1 天'`), 'previous-year navigation retains December records across the local new-year boundary');
+  await ev("document.querySelector('#year-next').click()");
+  assert(await ev(`document.querySelector('#focus-year').value==='${annualFixture.year}' && document.querySelector('#year-next').disabled`), 'next-year navigation returns to current year without offering future years');
+  await ev(`document.querySelector('#focus-year').value='${annualFixture.leapYear}';document.querySelector('#focus-year').dispatchEvent(new Event('change'))`);
+  const leapFebruaryMinutes = previousIsLeap ? 25 : 15, leapFebruaryCount = previousIsLeap ? 3 : 2, leapFebruaryDays = previousIsLeap ? 2 : 1;
+  assert(await ev(`[...document.querySelectorAll('#monthly-table-body tr')[1].children].map(n=>n.textContent).join('|')==='2 月|${leapFebruaryMinutes} 分|${leapFebruaryCount} 次|${leapFebruaryDays} 天'`), 'leap-day sessions stay in February and count February 29 once');
+  const yearsExpected = [...new Set([annualFixture.year, annualFixture.year - 1, annualFixture.leapYear])].sort((a, b) => a - b);
+  assert(await ev(`JSON.stringify([...document.querySelector('#focus-year').options].map(o=>Number(o.value)))===${JSON.stringify(JSON.stringify(yearsExpected))}`), 'year selector lists only the current year and years with imported records');
+  await ev("document.querySelector('#focus-year').selectedIndex=0;document.querySelector('#focus-year').dispatchEvent(new Event('change'))");
+  assert(await ev("document.querySelector('#year-prev').disabled && !document.querySelector('#year-next').disabled"), 'earliest recorded year disables earlier navigation');
+  await ev(`document.querySelector('#focus-year').value='${annualFixture.year}';document.querySelector('#focus-year').dispatchEvent(new Event('change'));document.querySelector('.monthly-details').open=true`);
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
+  await screenshot('desktop-year.png');
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 320, height: 760, deviceScaleFactor: 1, mobile: true });
+  assert(await ev("document.documentElement.scrollWidth<=320 && document.querySelector('.monthly-table-scroll').scrollWidth>document.querySelector('.monthly-table-scroll').clientWidth"), 'expanded annual table scrolls within its container without overflowing the 320px page');
+  await ev("document.querySelector('.monthly-table-scroll').scrollLeft=100");
+  assert(await ev("document.querySelector('.monthly-table-scroll').scrollLeft>0 && window.scrollX===0"), 'mobile monthly table can move horizontally while the page stays fixed');
+  await ev("document.querySelector('.monthly-table-scroll').scrollLeft=0");
+  await screenshot('mobile-year.png');
+
+  // Exercise the native export contract without writing to an Android device or user profile.
+  await ev("window.nativeBackupCalls=[];window.NextStepAndroid={saveBackup:(contents,name)=>window.nativeBackupCalls.push({contents,name})};document.querySelector('#export-data').click()");
+  assert(await ev("nativeBackupCalls.length===1 && JSON.stringify(JSON.parse(nativeBackupCalls[0].contents))===JSON.stringify(JSON.parse(localStorage.getItem(StepCore.key))) && nativeBackupCalls[0].name.endsWith('.json')"), 'Android export bridge receives the unmodified version-one JSON and backup filename');
+  assert(await ev("!document.querySelector('#toast').hidden && document.querySelector('#toast').textContent==='请选择备份的保存位置。'"), 'Android export waits for the save result instead of claiming early success');
+  await ev("window.dispatchEvent(new CustomEvent('nextstep-backup-result',{detail:{status:'success'}}))");
+  assert(await ev("document.querySelector('#toast').textContent==='备份已保存，可以用它迁移到其他设备。'"), 'Android successful save event displays the completion message');
+  await ev("document.querySelector('#export-data').click();window.dispatchEvent(new CustomEvent('nextstep-backup-result',{detail:{status:'cancelled'}}))");
+  assert(await ev("document.querySelector('#toast').textContent==='已取消保存，当前数据没有改变。' && JSON.parse(localStorage.getItem(StepCore.key)).sessions.length===7"), 'Android cancelled save event keeps all data and reports cancellation');
+  await ev("delete window.NextStepAndroid;delete window.nativeBackupCalls");
   await ev("localStorage.setItem(StepCore.key,'broken json')"); await reload();
   assert(await ev("!document.querySelector('#storage-warning').hidden && localStorage.getItem(StepCore.key)==='broken json'"), 'corrupt storage is preserved instead of overwritten');
   assert(errors.length === 0, 'no browser runtime errors');

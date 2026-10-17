@@ -7,7 +7,8 @@
   <title>下一小步 · 让想法慢慢发生</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
-  <script src="core.js" defer></script><script src="app.js" defer></script>
+  <link rel="stylesheet" href="stats.css">
+  <script src="core.js" defer></script><script src="stats.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
 <header class="header wrap">
@@ -46,7 +47,19 @@
   </section>
   <section class="footprints" id="footprints" aria-labelledby="footprint-title">
     <div class="footprint-heading"><div class="eyebrow">LITTLE BY LITTLE</div><h2 id="footprint-title">每一步，都算数。</h2><p>这里留下你的真实行动。<br>没有连续打卡，也没有落后的日子。</p><div class="data-actions"><button class="text-button" id="export-data">导出备份 ↗</button><button class="text-button" id="import-data">导入备份 ↙</button><input id="import-file" type="file" accept="application/json,.json" hidden></div></div>
-    <div class="stats-panel"><div class="stats"><div><strong id="stat-steps">0</strong><span>已完成的小步</span></div><div><strong id="stat-minutes">0</strong><span>累计专注 / 分钟</span></div><div><strong id="stat-goals">0</strong><span>已达成的目标</span></div></div><div class="week-heading"><span>最近 7 天的专注</span><span id="week-total">0 分钟</span></div><div id="week-chart" class="week-chart" aria-label="最近七天专注时长"></div></div>
+    <div class="stats-panel">
+      <div class="stats"><div><strong id="stat-steps">0</strong><span>已完成的小步</span></div><div><strong id="stat-minutes">0</strong><span>累计专注 / 分钟</span></div><div><strong id="stat-goals">0</strong><span>已达成的目标</span></div></div>
+      <div class="stats-view-switch" role="group" aria-label="专注统计范围"><button id="stats-year-view" type="button" aria-pressed="true" aria-controls="annual-stats">全年 12 个月</button><button id="stats-week-view" type="button" aria-pressed="false" aria-controls="weekly-stats">最近 7 天</button></div>
+      <section id="weekly-stats" aria-label="最近七天专注统计" hidden><div class="week-heading"><span>最近 7 天的专注</span><span id="week-total">0 分钟</span></div><div id="week-chart" class="week-chart" aria-label="最近七天专注时长"></div></section>
+      <section id="annual-stats" aria-label="全年专注统计">
+        <div class="annual-heading"><span>把每个月的努力，放在一起。</span><div class="year-navigation"><button id="year-prev" type="button" aria-label="查看更早年份">‹</button><label class="sr-only" for="focus-year">统计年份</label><select id="focus-year" aria-label="统计年份"></select><button id="year-next" type="button" aria-label="查看更新年份">›</button></div></div>
+        <div class="annual-summary" aria-live="polite"><strong id="annual-duration">0 分钟</strong><span id="annual-description">0 次专注 · 0 个活跃日</span></div>
+        <div class="annual-chart-scroll"><div id="annual-chart" class="annual-chart" role="img" aria-label="全年各月专注时长"></div></div>
+        <p id="annual-empty" class="annual-empty" hidden>这一年还没有专注记录。每一个开始，都会慢慢积累在这里。</p>
+        <details class="monthly-details"><summary>查看 12 个月明细 <span>时长 · 次数 · 活跃天数</span></summary><p class="table-scroll-hint">左右滑动查看完整表格。</p><div class="monthly-table-scroll" tabindex="0" role="region" aria-label="每月专注统计明细，可横向滚动"><table class="monthly-table"><caption id="annual-table-caption">全年逐月专注统计</caption><thead><tr><th scope="col">月份</th><th scope="col">专注时长</th><th scope="col">专注次数</th><th scope="col">活跃天数</th></tr></thead><tbody id="monthly-table-body"></tbody><tfoot id="monthly-table-total"></tfoot></table></div></details>
+        <p class="annual-note">按专注结束时的本地日期统计；同一天多次专注只计 1 个活跃日。</p>
+      </section>
+    </div>
   </section>
   <section class="history-section"><div class="section-label"><span>最近的专注记录</span><span>保留每一次开始</span></div><div id="history-list"></div></section>
 </main>

@@ -1,0 +1,36 @@
+.stats-view-switch{display:inline-flex;gap:3px;padding:4px;margin-top:23px;background:#e9ecdf;border-radius:8px}
+.stats-view-switch button{background:transparent;border-radius:5px;padding:8px 13px;color:var(--muted);font-size:11px}
+.stats-view-switch button[aria-pressed=true]{background:#fafbf5;color:var(--green);box-shadow:0 1px 4px #283c3110}
+.annual-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:22px;font-size:11px;color:var(--muted)}
+.year-navigation{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.year-navigation button{background:none;font:23px/1 Georgia,serif;width:28px;height:32px;border-radius:5px}
+.year-navigation button:not(:disabled):hover{background:#e6ebde}
+.year-navigation select{border:0;background:transparent;color:var(--ink);font:12px var(--sans);padding:7px 3px;cursor:pointer}
+.year-navigation select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.annual-summary{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;margin-top:15px}
+.annual-summary strong{font:24px/1.6 var(--serif)}
+.annual-summary span{font-size:10px;color:var(--muted)}
+.annual-chart-scroll{max-width:100%;overflow-x:auto}
+.annual-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;min-width:260px;height:126px;margin-top:22px}
+.month-column{display:flex;align-items:center;flex-direction:column;justify-content:flex-end;gap:9px;min-width:0}
+.month-bar-track{height:100px;width:100%;max-width:36px;display:flex;align-items:flex-end}
+.month-bar{background:#849b6e;border-radius:3px 3px 0 0;width:100%;min-height:2px}
+.month-column span{font-size:9px;color:var(--muted);white-space:nowrap}
+.future-month .month-bar{background:#dce0d2}
+.future-month{color:#979d8e}
+.annual-empty{font-size:11px;color:var(--muted);line-height:1.8;margin-top:15px}
+.monthly-details{margin-top:23px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.monthly-details summary{padding:13px 0;cursor:pointer;font-size:11px}
+.monthly-details summary span{float:right;font-size:10px;color:var(--muted)}
+.monthly-table-scroll{overflow-x:auto;max-width:100%;padding-bottom:12px}
+.monthly-table{width:100%;min-width:420px;border-collapse:collapse;font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+.monthly-table caption{text-align:left;color:var(--muted);padding-bottom:10px;font-size:10px}
+.monthly-table th,.monthly-table td{padding:10px 8px;border-bottom:1px solid #e6e8dc;white-space:nowrap}
+.monthly-table thead th{font-weight:500;color:var(--muted);background:#ecefe3;font-size:10px}
+.monthly-table th:first-child{text-align:left;font-weight:500}
+.monthly-table tfoot th,.monthly-table tfoot td{border-bottom:0;font-weight:600;background:#eef1e6}
+.monthly-table-scroll:focus-visible,.monthly-details summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.annual-note{font-size:9px;color:var(--muted);line-height:1.8;margin-top:12px}
+.table-scroll-hint{display:none;font-size:9px;color:var(--muted);padding-bottom:8px}
+@media(max-width:900px){.annual-heading{align-items:flex-start;flex-direction:column;gap:6px}.annual-chart{gap:6px}.monthly-details summary span{display:none}.table-scroll-hint{display:block}}
+@media(max-width:580px){.annual-heading{flex-direction:row;align-items:center;gap:7px}.annual-heading>span{max-width:130px;font-size:10px}.annual-summary{gap:4px 10px}.annual-summary strong{font-size:22px}.annual-chart{gap:5px}.year-navigation button{width:25px}}
