@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-and-smoke-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v6
@@ -30,6 +30,23 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Locate the preinstalled Android SDK tools
+        run: |
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sdkmanager_path="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager_path" ]; then
+            sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -path '*/bin/sdkmanager' -print | sort -V | tail -n 1)"
+          fi
+          if [ ! -x "$sdkmanager_path" ] || [ ! -x "$(dirname "$sdkmanager_path")/avdmanager" ]; then
+            echo "::error::Android command-line tools were not found inside the runner SDK."
+            exit 1
+          fi
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
+          dirname "$sdkmanager_path" >> "$GITHUB_PATH"
+          echo "$sdk_root/platform-tools" >> "$GITHUB_PATH"
+          echo "$sdk_root/emulator" >> "$GITHUB_PATH"
+          "$sdkmanager_path" --version
       - name: Install Android build and emulator packages
         run: |
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "emulator" "system-images;android-35;google_apis;x86_64"
