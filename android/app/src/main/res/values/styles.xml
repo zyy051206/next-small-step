@@ -2,14 +2,15 @@
 <resources>
     <color name="paper">#F5F4ED</color>
     <color name="green">#355842</color>
-    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="BaseAppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">@color/green</item>
         <item name="android:windowBackground">@color/paper</item>
         <item name="android:statusBarColor">@color/paper</item>
-        <item name="android:navigationBarColor">@color/paper</item>
+        <!-- Android 8.0 uses light navigation buttons, so keep this bar dark. -->
+        <item name="android:navigationBarColor">@color/green</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+    <style name="AppTheme" parent="BaseAppTheme" />
 </resources>
