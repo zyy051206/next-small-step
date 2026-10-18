@@ -130,9 +130,9 @@
     dialog.id = 'date-dialog';
     dialog.setAttribute('aria-labelledby', 'date-dialog-title');
     dialog.innerHTML = `<form id="date-form"><div class="dialog-heading"><span class="planner-eyebrow">SAVE A LITTLE ANTICIPATION</span><button type="button" id="date-close" class="close-button" aria-label="关闭重要日期编辑">×</button></div><h2 id="date-dialog-title">记住一个重要日子</h2>
-      <label for="date-title">这个日子叫什么</label><input id="date-title" name="title" maxlength="100" required autocomplete="off" placeholder="给这个日子起个名字">
+      <label for="date-title">这个日子叫什么</label><input id="date-title" name="title" maxlength="100" required autocomplete="off">
       <label for="date-day">日期</label><input id="date-day" name="date" type="date" min="0001-01-01" max="9999-12-31" required>
-      <label for="date-category">分类 <span class="optional">可自定义</span></label><input id="date-category" name="category" maxlength="32" list="date-category-options" autocomplete="off" placeholder="考试、工作、生活、纪念日…"><datalist id="date-category-options"><option value="考试"></option><option value="工作"></option><option value="生活"></option><option value="纪念日"></option></datalist>
+      <label for="date-category">分类 <span class="optional">可自定义</span></label><input id="date-category" name="category" maxlength="32" list="date-category-options" autocomplete="off"><datalist id="date-category-options"><option value="考试"></option><option value="工作"></option><option value="生活"></option><option value="纪念日"></option></datalist>
       <div class="planner-date-options"><label><input id="date-repeat" name="repeat" type="checkbox"><span>每年重复<small>每年重新计算倒计时</small></span></label><label><input id="date-pinned" name="pinned" type="checkbox"><span>置顶显示<small>把最重要的日子放在前面</small></span></label></div>
       <p id="date-leap-note" class="planner-form-note" hidden>2 月 29 日在平年按 2 月 28 日计算。</p><p id="date-error" class="form-error" role="alert"></p><button type="submit" class="button primary">保存日期 <span aria-hidden="true">↗</span></button></form>`;
     document.body.append(dialog);
