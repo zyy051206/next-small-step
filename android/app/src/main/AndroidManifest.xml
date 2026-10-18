@@ -15,6 +15,10 @@
         android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
         <receiver android:name=".FocusReminder" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/><action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED"/></intent-filter></receiver>
+<receiver android:name=".HomeWidgets$Focus" android:exported="false" android:label="@string/widget_focus"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_focus"/></receiver>
+<receiver android:name=".HomeWidgets$Todos" android:exported="false" android:label="@string/widget_todos"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_todos"/></receiver>
+<receiver android:name=".HomeWidgets$Dates" android:exported="false" android:label="@string/widget_dates"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_dates"/></receiver>
+<receiver android:name=".HomeWidgets$Refresh" android:exported="false"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/><action android:name="android.intent.action.TIME_SET"/><action android:name="android.intent.action.TIMEZONE_CHANGED"/><action android:name="android.intent.action.DATE_CHANGED"/><action android:name="android.intent.action.MY_PACKAGE_REPLACED"/></intent-filter></receiver>
         <provider
             android:name=".UpdateFileProvider"
             android:authorities="${applicationId}.updates"
@@ -24,6 +28,7 @@
         </provider>
         <activity
             android:name=".MainActivity"
+            android:launchMode="singleTask"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:enableOnBackInvokedCallback="true"

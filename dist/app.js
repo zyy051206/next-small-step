@@ -12,7 +12,7 @@
   catch { storageBlocked = true; warning('浏览器中的进度无法读取。为保护原数据，本次不会覆盖保存；请先导出保留原始数据，或导入有效备份恢复。'); }
   function save() {
     if (storageBlocked) return;
-    try { localStorage.setItem(C.key, JSON.stringify(state)); }
+    try { localStorage.setItem(C.key, JSON.stringify(state)); window.StepWidgets?.sync(state); }
     catch { warning('浏览器无法保存进度（可能是存储已满或被禁用）。当前内容暂存在此页面，请导出备份后再关闭。'); }
   }
   function confirmAction(title, body, action) { confirmation = action; $('confirm-title').textContent = title; $('confirm-body').textContent = body; $('confirm-dialog').showModal(); $('confirm-no').focus(); }
@@ -89,7 +89,7 @@
     $('focus-state').textContent = t ? t.status === 'running' ? (isFocus ? '正在专注' : '正在休息') : '已暂停' : (isFocus ? '准备开始' : mode === 'shortBreak' ? '短休息 · 等待开始' : '长休息 · 等待开始');
     $('focus-task').textContent = isFocus ? (step?.text || (getGoal()?.steps.length && getGoal().steps.every(s => s.done) ? '这个目标已完成，去迎接下一件想做的事。' : '选好下一步，再把时间留给它。')) : (mode === 'shortBreak' ? '离开屏幕，给注意力一点恢复的时间。' : '完成了一轮。伸个懒腰，慢慢充好电。');
     $('ring-progress').style.strokeDashoffset = String(t ? 678.584 * ms / t.duration : 678.584);
-    $('timer-start').textContent = t ? t.status === 'running' ? '暂停一下 Ⅱ' : `继续${isFocus ? '专注' : '休息'} →` : `开始${isFocus ? '专注' : '休息'} →`;
+    $('timer-start').textContent = t ? t.status === 'running' ? '暂停一下 Ⅱ' : `继续${isFocus ? '专注' : '休息'} →` : isFocus && !step ? '先添加或选择一个行动' : `开始${isFocus ? '专注' : '休息'} →`;
     $('timer-start').disabled = isFocus && !step; $('timer-reset').disabled = !t; $('finish-step').disabled = !step || !isFocus;
     const presets = document.querySelector('.durations'); if (presets) presets.hidden = !isFocus;
     document.querySelectorAll('[data-minutes]').forEach(el => { el.disabled = !!t || !isFocus; el.setAttribute('aria-pressed', String(Number(el.dataset.minutes) === (t && isFocus ? t.duration / 60000 : state.minutes))); });
@@ -126,7 +126,7 @@
     $('today-label').textContent = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + '  /  A FRESH START';
     return true;
   }
-  function render() { refreshDateHeading(); renderGoals(); renderSteps(); drawTimer(); renderStats(); window.StepPlanner?.render(state); }
+  function render() { refreshDateHeading(); renderGoals(); renderSteps(); drawTimer(); renderStats(); window.StepPlanner?.render(state); window.StepWidgets?.sync(state); }
   function openGoal(id = null) { if (!id && state.goals.length >= 100) { toast('最多保留 100 个目标，请先整理已有目标。'); return; } editId = id; const g = state.goals.find(g => g.id === id); $('goal-form').reset(); $('goal-error').textContent = ''; $('goal-dialog-title').textContent = g ? '给目标一点调整。' : '你想让什么发生？'; $('goal-name').value = g?.title || ''; $('goal-reason').value = g?.why || ''; $('new-steps-fields').hidden = !!g; $('goal-dialog').showModal(); $('goal-name').focus(); }
   $('new-goal').onclick = () => openGoal(); $('empty-create').onclick = () => openGoal(); $('edit-goal').onclick = () => openGoal(state.selectedGoal);
   $('goal-form').onsubmit = e => {
@@ -263,5 +263,5 @@
   }
   window.StepApp = { getState: () => state, saveAndRender: () => { save(); render(); }, confirm: confirmAction, toast, completeStep, selectTask, editTask, addTask };
   window.StepPlanner?.init(window.StepApp);
-  render(); tick(); setInterval(tick, 1000);
+  render(); tick(); window.StepWidgets?.init(window.StepApp); setInterval(tick, 1000);
 })();

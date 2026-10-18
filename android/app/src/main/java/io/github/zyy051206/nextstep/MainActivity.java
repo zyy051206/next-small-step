@@ -47,10 +47,12 @@ public final class MainActivity extends Activity {
     private boolean pageReady;
     private AppUpdater updater;
     private String pendingUpdateResult;
+    private String pendingWidgetCommand;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        pendingWidgetCommand = state != null ? state.getString("pendingWidgetCommand") : HomeWidgets.trustedCommand(this, getIntent());
         exportPending = state != null && state.getBoolean("exportPending", false);
         if (state != null) pendingResult = state.getString("pendingResult");
 
@@ -85,6 +87,7 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         webView.addJavascriptInterface(new BackupBridge(), "NextStepAndroid");
+        webView.addJavascriptInterface(new HomeWidgets.Bridge(this), "NextStepWidgets");
         webView.addJavascriptInterface(new FocusReminder.Bridge(this), "NextStepReminders");
         updater = new AppUpdater(this, detail -> {
             pendingUpdateResult = detail.toString();
@@ -109,6 +112,7 @@ public final class MainActivity extends Activity {
                 pageReady = isLocalPage(Uri.parse(url));
                 if (pageReady && pendingResult != null) dispatchBackupResult();
                 if (pageReady && pendingUpdateResult != null) dispatchUpdateResult();
+                if (pageReady) dispatchWidgetCommand();
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -265,7 +269,17 @@ public final class MainActivity extends Activity {
         pendingUpdateResult = null;
     }
 
+    synchronized String takeWidgetCommand() { String result=pendingWidgetCommand; pendingWidgetCommand=null; return result; }
+    private void dispatchWidgetCommand() {
+        if (webView!=null && pageReady && !isDestroyed()) webView.evaluateJavascript("window.dispatchEvent(new Event('nextstep-widget-command'))",null);
+    }
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent);
+        synchronized(this) { pendingWidgetCommand=HomeWidgets.trustedCommand(this,intent); }
+        dispatchWidgetCommand();
+    }
     @Override protected void onSaveInstanceState(Bundle out) {
+        synchronized(this) { out.putString("pendingWidgetCommand", pendingWidgetCommand); }
         out.putBoolean("exportPending", exportPending);
         out.putString("pendingResult", pendingResult);
         if (updater != null) out.putString("pendingInstallRequest", updater.pendingInstallRequest());
@@ -300,6 +314,8 @@ public final class MainActivity extends Activity {
         if (webView != null) {
             webView.removeJavascriptInterface("NextStepAndroid");
             webView.removeJavascriptInterface("NextStepUpdates");
+            webView.removeJavascriptInterface("NextStepWidgets");
+            webView.removeJavascriptInterface("NextStepReminders");
             webView.destroy();
             webView = null;
         }

@@ -47,3 +47,11 @@ APK 输出：`android/app/build/outputs/apk/debug/app-debug.apk` 与 `android/ap
 元数据优先来自固定仓库的 HTTPS API；失败时尝试该仓库最新正式发布的 android-update.json。API 禁止重定向，备用资源仅允许已列出的 HTTPS 下载域名。下载起始地址精确匹配该仓库、标签与 APK 文件名；重定向仅允许明确列出的 GitHub HTTPS 下载主机，限制跳转次数、等待时间及 512 MiB 文件上限。要求发布资产提供 SHA-256，并核对流的实际字节数、SHA-256、APK 包名、递增的 versionCode、versionName 和当前应用签名。每次安装以及恢复缓存都重新验证；校验失败不能启动安装。FileProvider 只暴露 `cache/updates/install/`，不暴露业务数据、背景图或更新元数据，安装 Intent 仅授予临时读取权限。网页不能指定网络地址或文件路径。
 
 相关接口依据：[Android 网络连接](https://developer.android.com/reference/java/net/HttpURLConnection)、[FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)、[应用安装来源权限](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls())、[签名信息](https://developer.android.com/reference/android/content/pm/SigningInfo)、[GitHub 最新发布接口](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。
+
+## 桌面组件（2.2.0）
+
+提供“专注计时”“今日待办”“重要日期”三个安卓标准桌面组件。打开应用侧栏的“桌面组件”可请求添加；如手机桌面没有弹出确认，请长按桌面空白处，在组件列表搜索“下一小步”。适配目标为用户的 iQOO 15 / OriginOS 6，仍需真机确认桌面入口与尺寸。
+
+计时采用系统 Chronometer；应用进入后台后仍显示倒计时。点击开始、暂停、继续或待办会打开应用，用原有计时和数据保存逻辑处理。组件只缓存展示快照，不引入第二份可编辑进度；过期的操作会被拒绝，重复完成不会撤销任务。数据变化、日期变化、重启及系统定期刷新时更新组件，强行停止和省电可能延迟状态刷新。
+
+组件不上传内容。组件显示的标题在桌面可见；删除组件不删除应用数据。

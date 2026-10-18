@@ -1,2 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><string name="app_name">下一小步</string></resources>
+<resources><string name="app_name">下一小步</string><string name="widget_brand">下一小步</string><string name="widget_initial">打开应用，同步你的进度</string><string name="widget_open">打开应用 ↗</string><string name="widget_hint">点击操作时进入应用</string>
+<string name="widget_focus">下一小步 · 专注计时</string><string name="widget_todos">下一小步 · 今日待办</string><string name="widget_dates">下一小步 · 重要日期</string>
+<string name="widget_focus_description">在桌面查看倒计时，点按进入应用开始、暂停或继续</string><string name="widget_todos_description">查看今天的待办，点按进入应用完成任务</string><string name="widget_dates_description">查看重要日期的倒数或已经走过的天数</string></resources>

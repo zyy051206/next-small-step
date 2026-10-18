@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_card" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_light">
+ <TextView android:id="@+id/widget_brand" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_brand" android:textColor="#45654F" android:textSize="11sp" android:fontFamily="sans-serif-medium" android:maxLines="1"/>
+ <TextView android:id="@+id/widget_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="@string/widget_initial" android:textColor="#243F30" android:textSize="17sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end"/>
+ <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="vertical" android:gravity="center_vertical">
+  <Chronometer android:id="@+id/widget_clock" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="34sp" android:textColor="#243F30" android:fontFamily="sans-serif-light" android:visibility="gone"/>
+  <TextView android:id="@+id/widget_time" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="34sp" android:textColor="#243F30" android:fontFamily="sans-serif-light" android:visibility="gone"/>
+  <TextView android:id="@+id/widget_line_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="30dp" android:gravity="center_vertical" android:textColor="#243F30" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone"/>
+  <TextView android:id="@+id/widget_line_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="30dp" android:gravity="center_vertical" android:textColor="#243F30" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone"/>
+  <TextView android:id="@+id/widget_line_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="30dp" android:gravity="center_vertical" android:textColor="#243F30" android:textSize="14sp" android:maxLines="1" android:ellipsize="end" android:visibility="gone"/>
+ </LinearLayout>
+ <TextView android:id="@+id/widget_button" android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical" android:text="@string/widget_open" android:textColor="#45654F" android:textSize="13sp" android:textStyle="bold"/>
+ <TextView android:id="@+id/widget_hint" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_hint" android:textColor="#45654F" android:textSize="10sp" android:maxLines="1"/>
+</LinearLayout>
