@@ -16,7 +16,7 @@ fs.mkdirSync(output, { recursive: true });
 async function unpackInstaller() {
   fs.mkdirSync(profile, { recursive: true });
   const archiveRoot = path.join(profile, 'installer-payload');
-  const appRoot = path.join(profile, 'application');
+  let appRoot = path.join(profile, 'application');
   const sevenZip = await require('app-builder-lib/out/toolsets/7zip').getPath7za();
   async function extract(file, directory) {
     await new Promise((resolve, reject) => {
@@ -26,17 +26,24 @@ async function unpackInstaller() {
     });
   }
   await extract(installer, archiveRoot);
-  const archives = [];
-  function visit(directory) {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const file = path.join(directory, entry.name);
-      if (entry.isDirectory()) visit(file);
-      else if (/^app-64\.7z$/i.test(entry.name)) archives.push(file);
+  // Some 7za builds detect the embedded 7z application directly instead of
+  // exposing the surrounding NSIS container and its app-64.7z entry.
+  if (fs.existsSync(path.join(archiveRoot, 'NextSmallStep.exe'))
+      && fs.existsSync(path.join(archiveRoot, 'resources/app-update.yml'))) {
+    appRoot = archiveRoot;
+  } else {
+    const archives = [];
+    function visit(directory) {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name);
+        if (entry.isDirectory()) visit(file);
+        else if (/^app-64\.7z$/i.test(entry.name)) archives.push(file);
+      }
     }
+    visit(archiveRoot);
+    if (archives.length !== 1) throw new Error('Expected exactly one x64 NSIS application payload');
+    await extract(archives[0], appRoot);
   }
-  visit(archiveRoot);
-  if (archives.length !== 1) throw new Error('Expected exactly one x64 NSIS application payload');
-  await extract(archives[0], appRoot);
   exe = path.join(appRoot, 'NextSmallStep.exe');
   if (!fs.existsSync(exe) || !fs.existsSync(path.join(appRoot, 'resources/app-update.yml'))) {
     throw new Error('NSIS application or update provider configuration is missing');
