@@ -5,6 +5,10 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import java.io.File;
+import java.io.FileOutputStream;
 import android.view.View;
 import android.widget.Chronometer;
 import android.widget.FrameLayout;
@@ -64,11 +68,19 @@ public class HomeWidgetsTest {
     }
     private View inflate(Class<?> type,int id) throws Exception {
         AtomicReference<View> result=new AtomicReference<>(); AtomicReference<Exception> error=new AtomicReference<>();
-        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {try {result.set(HomeWidgets.views(context,id,type).apply(context,new FrameLayout(context)));}catch(Exception e){error.set(e);}});
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {try {View view=HomeWidgets.views(context,id,type).apply(context,new FrameLayout(context));
+            float density=context.getResources().getDisplayMetrics().density;int width=(int)(320*density),height=(int)((type==HomeWidgets.Focus.class?190:230)*density);
+            view.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));view.layout(0,0,width,height);
+            Bitmap bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));
+            String suffix=HomeWidgets.snapshot(context).optString("theme").equals("dark")?"-dark":"";
+            try(FileOutputStream output=new FileOutputStream(new File(context.getFilesDir(),"widget-"+type.getSimpleName().toLowerCase(java.util.Locale.ROOT)+suffix+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
+            result.set(view);}catch(Exception e){error.set(e);}});
         if(error.get()!=null) throw error.get(); return result.get();
     }
     @Test public void remoteViewsInflateAndFocusClockKeepsRunningWithoutWebview() throws Exception {
         JSONObject data=base(); data.put("timer",new JSONObject().put("kind","focus").put("status","running").put("duration",300000).put("remaining",300000).put("endsAt",System.currentTimeMillis()+300000).put("stepId","step"));
+        data.getJSONArray("tasks").put(task("读完今天的两页笔记",LocalDate.now().toString(),"high")).put(task("整理项目的下一步",LocalDate.now().toString(),"normal"));
+        data.getJSONArray("dates").put(new JSONObject().put("title","项目提交").put("date",LocalDate.now().plusDays(20).toString()).put("repeat","none").put("pinned",true));
         assertTrue(HomeWidgets.publish(context,data.toString()));
         View focus=inflate(HomeWidgets.Focus.class,1);
         assertEquals(View.VISIBLE,focus.findViewById(R.id.widget_clock).getVisibility());
@@ -76,6 +88,8 @@ public class HomeWidgetsTest {
         assertEquals("正在专注",((TextView)focus.findViewById(R.id.widget_title)).getText().toString());
         assertNotNull(inflate(HomeWidgets.Todos.class,2));
         assertNotNull(inflate(HomeWidgets.Dates.class,3));
+        assertTrue(HomeWidgets.publish(context,data.put("theme","dark").toString()));
+        assertNotNull(inflate(HomeWidgets.Focus.class,4));
     }
     @Test public void untrustedExternalIntentCannotPerformWidgetActions() throws Exception {
         JSONObject command=new JSONObject().put("action","pause").put("page","workspace");

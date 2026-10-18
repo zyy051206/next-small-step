@@ -99,6 +99,13 @@ jobs:
           adb shell settings put global animator_duration_scale 0
       - name: Verify launch, persistent data, and Android back action
         run: gradle -p android --no-daemon connectedDebugAndroidTest
+      - name: Collect widget preview images
+        if: always()
+        run: |
+          mkdir -p android/app/build/reports/widget-previews
+          for kind in focus todos dates focus-dark; do
+            adb -s emulator-5554 exec-out run-as io.github.zyy051206.nextstep cat "files/widget-$kind.png" > "android/app/build/reports/widget-previews/$kind.png" 2>/dev/null || true
+          done
       - name: Prepare unsigned release, tested debug APK, and signing tool
         run: |
           mkdir -p android/artifacts

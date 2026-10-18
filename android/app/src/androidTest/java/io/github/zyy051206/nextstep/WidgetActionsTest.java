@@ -37,7 +37,7 @@ public class WidgetActionsTest {
             JSONObject start=new JSONObject().put("action","start").put("page","workspace").put("kind","focus").put("goalId","widget-goal").put("stepId","widget-step").put("endsAt",0);
             command(scenario,start);
             await(scenario,"StepApp.getState().timer?.status==='running'");
-            long endsAt=Long.parseLong(evaluate(scenario,"StepApp.getState().timer.endsAt"));
+            long endsAt=(long)Double.parseDouble(evaluate(scenario,"StepApp.getState().timer.endsAt"));
             JSONObject pause=new JSONObject(start.toString()).put("action","pause").put("endsAt",endsAt);
             command(scenario,pause);await(scenario,"StepApp.getState().timer?.status==='paused'");
             // Repeated delivery must never toggle a paused timer back to running.
