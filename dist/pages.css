@@ -1,0 +1,29 @@
+/* Each destination is a separate view; inactive views keep their state. */
+main.wrap{min-height:calc(100dvh - 82px)}
+.app-page{min-width:0}
+.app-page[hidden]{display:none!important}
+.app-page.planner-section,.app-page.dates-section{margin-top:0;padding-top:34px;scroll-margin-top:0}
+.app-page .planner-section-heading,.app-page .footprint-heading{min-height:100px;margin-bottom:24px}
+.app-page .planner-section-heading h1,.app-page .footprint-heading h1{font:650 30px/1.4 var(--sans);letter-spacing:-.8px;margin:10px 0 8px}
+.app-page h1:focus{outline:none}
+.header nav a>span{white-space:nowrap}
+.ongoing-focus{position:fixed;right:28px;bottom:24px;z-index:30;display:flex;align-items:center;gap:22px;padding:12px 17px;background:var(--green);color:#fff;border:1px solid #466d54;border-radius:12px;box-shadow:0 6px 24px #243f3026;text-align:left}
+.ongoing-focus strong{font-size:13px;font-weight:550;font-variant-numeric:tabular-nums}
+.ongoing-focus span{font-size:11px;opacity:.85}
+.ongoing-focus:hover{background:#264d39}
+.has-ongoing-focus .toast{bottom:89px}
+.has-ongoing-focus .footer{padding-bottom:95px}
+@media(max-width:1279px){main.wrap{min-height:calc(100dvh - 158px)}}
+@media(max-width:700px){
+  html{scroll-padding-top:119px}
+  .header{position:sticky;top:0}
+  main.wrap{min-height:calc(100dvh - 182px)}
+  .app-page.planner-section,.app-page.dates-section,.app-page.footprints{padding-top:23px}
+  .app-page .planner-section-heading,.app-page .footprint-heading{min-height:83px;margin-bottom:19px}
+  .app-page .planner-section-heading h1,.app-page .footprint-heading h1{font-size:25px;margin:8px 0 6px}
+  .app-page .planner-section-heading{align-items:center}
+  .ongoing-focus{left:18px;right:18px;bottom:16px;justify-content:space-between;gap:10px;padding:12px 16px}
+  .ongoing-focus strong{font-size:12px}
+  .ongoing-focus span{font-size:10px}
+  .has-ongoing-focus .toast{bottom:80px}
+}

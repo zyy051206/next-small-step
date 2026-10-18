@@ -96,6 +96,7 @@
     if ($('focus-settings-open')) $('focus-settings-open').disabled = !!t;
     if ($('pomodoro-progress')) $('pomodoro-progress').textContent = `已完成 ${state.pomodoroCount} 个番茄 · 本轮 ${state.pomodoroCount % state.preferences.cycles} / ${state.preferences.cycles}`;
     document.title = t ? `${$('timer-readout').textContent} · ${t.status === 'running' ? (isFocus ? '专注中' : '休息中') : '已暂停'} · 下一小步` : '下一小步 · 让想法慢慢发生';
+    window.StepPages?.updateTimer();
   }
   function renderStats() {
     $('stat-steps').textContent = state.goals.reduce((n, g) => n + g.steps.filter(s => s.done).length, 0);

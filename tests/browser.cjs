@@ -206,7 +206,7 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
   assert(await ev(`JSON.stringify([...document.querySelector('#focus-year').options].map(o=>Number(o.value)))===${JSON.stringify(JSON.stringify(yearsExpected))}`), 'year selector lists only the current year and years with imported records');
   await ev("document.querySelector('#focus-year').selectedIndex=0;document.querySelector('#focus-year').dispatchEvent(new Event('change'))");
   assert(await ev("document.querySelector('#year-prev').disabled && !document.querySelector('#year-next').disabled"), 'earliest recorded year disables earlier navigation');
-  await ev(`document.querySelector('#focus-year').value='${annualFixture.year}';document.querySelector('#focus-year').dispatchEvent(new Event('change'));document.querySelector('.monthly-details').open=true`);
+  await ev(`StepPages.show('footprints');document.querySelector('#focus-year').value='${annualFixture.year}';document.querySelector('#focus-year').dispatchEvent(new Event('change'));document.querySelector('.monthly-details').open=true`);
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false });
   await screenshot('desktop-year.png');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 320, height: 760, deviceScaleFactor: 1, mobile: true });

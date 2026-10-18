@@ -109,7 +109,7 @@
     if (!$('planner') || !$('important-dates')) return;
     ready = true;
     $('planner').innerHTML = `
-      <div class="planner-section-heading"><div><span class="planner-eyebrow">MAKE SPACE FOR YOUR DAY</span><h2>日历与计划</h2><p>把想做的事，安排到看得见的日子里。</p></div></div>
+      <div class="planner-section-heading"><div><span class="planner-eyebrow">MAKE SPACE FOR YOUR DAY</span><h1 id="planner-title">日历与计划</h1><p>把想做的事，安排到看得见的日子里。</p></div></div>
       <div class="planner-layout">
         <div class="planner-calendar">
           <div class="planner-calendar-toolbar"><h3 id="planner-month-label"></h3><div class="planner-calendar-nav"><button id="planner-today" type="button">今天</button><button id="planner-prev-month" type="button" aria-label="上一个月">‹</button><button id="planner-next-month" type="button" aria-label="下一个月">›</button></div></div>
@@ -125,7 +125,7 @@
         </div>
       </div>`;
     $('important-dates').innerHTML = `
-      <div class="planner-section-heading"><div><span class="planner-eyebrow">SOMETHING TO LOOK FORWARD TO</span><h2>重要日期</h2><p>把期待和约定，放进日历。</p></div><button id="dates-add" class="planner-add-button" type="button"><span aria-hidden="true">＋</span>添加日期</button></div>
+      <div class="planner-section-heading"><div><span class="planner-eyebrow">SOMETHING TO LOOK FORWARD TO</span><h1 id="dates-title">重要日期</h1><p>把期待和约定，放进日历。</p></div><button id="dates-add" class="planner-add-button" type="button"><span aria-hidden="true">＋</span>添加日期</button></div>
       <div id="date-list" class="planner-date-list"></div>`;
     const dialog = element('dialog', 'planner-date-dialog');
     dialog.id = 'date-dialog';
@@ -232,7 +232,9 @@
       const row = element('div', `planner-task-row${step.done ? ' done' : ''}${active ? ' active' : ''}`);
       const check = button(step.done ? '✓' : '', 'planner-task-check', () => bridge.completeStep(goal, step), `${step.done ? '撤销完成' : '完成待办'}：${step.text}`);
       check.setAttribute('aria-pressed', String(step.done));
-      const content = button('', 'planner-task-title', () => { if (!step.done) bridge.selectTask(goal.id, step.id); }, step.done ? `${step.text}，已完成` : `选择专注任务：${step.text}`);
+      const content = button('', 'planner-task-title', () => {
+        if (!step.done && bridge.selectTask(goal.id, step.id)) root.StepPages?.show('workspace', { focusTarget: '#timer-start' });
+      }, step.done ? `${step.text}，已完成` : `选择专注任务：${step.text}`);
       content.disabled = step.done;
       const title = element('strong', '', step.text);
       const meta = element('span', 'planner-task-meta');
