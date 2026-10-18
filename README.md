@@ -43,6 +43,7 @@ node serve.cjs
 - 累计统计、最近七天 / 全年十二个月视图，可切换历史年份。
 - 每月专注时长、次数、活跃天数和全年合计；手机明细表可横向滑动。全部历史记录可导出。
 - JSON 备份导入/导出，导入前校验和二次确认，异常存储保护。
+- 外观设置：选择本地背景图片、调节浅色遮罩；应用内图标和 Logo 支持常用色板与自定义颜色，可恢复默认。
 - 手机布局、键盘操作、减少动态效果支持。
 - 安卓 APK 内置页面，离线运行；通过系统文件选择器导入和导出备份。
 - Windows EXE 内置页面，离线运行；备份通过系统窗口保存，升级 EXE 保留本机进度。
@@ -65,6 +66,8 @@ Windows 进度保存在 `%APPDATA%\NextSmallStep`，替换 EXE 不改变数据�
 
 新版备份格式为 v2，自动兼容旧版 v1 数据和备份，保留全部历史专注记录；存储键继续使用 `next-small-step.v1`。新版备份请在 v2 应用中导入。
 
+外观入口位于导航区的“外观”。背景图片单独保存在本机 IndexedDB，颜色和遮罩偏好保存在独立的 localStorage 键；不占用任务存储，不上传图片。刷新或重开应用后恢复，不随 JSON 进度备份迁移；恢复默认背景会移除已保存的图片。
+
 `dist/core.js` 是可复用的数据校验、日期和计时逻辑；`dist/app.js` 管理交互与存储；`dist/planner.js` 管理日历和重要日期；样式文件定义响应式界面。所有用户内容都以纯文本渲染。
 
 ## 验证
@@ -81,6 +84,7 @@ node --test tests/core.test.cjs tests/planner.test.cjs
 node tests/browser.cjs
 node tests/pages.cjs
 node tests/day-rollover.cjs
+node tests/appearance.cjs
 ```
 
 浏览器测试使用 Edge 的默认安装路径 `C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`，并通过 CDP 检查真实交互；若 Edge 安装位置不同，需要调整 `tests/browser.cjs` 中的路径。测试使用 `.qa/` 下的隔离浏览器目录，不访问个人浏览器数据。

@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 
 const dev = process.argv.includes('--dev');
-const exe = dev ? require('electron') : path.resolve(process.argv[2] || path.join(__dirname, 'release/next-small-step-2.0.0-windows-x64.exe'));
+const exe = dev ? require('electron') : path.resolve(process.argv[2] || path.join(__dirname, `release/next-small-step-${require('./package.json').version}-windows-x64.exe`));
 const token = crypto.randomUUID();
 const profile = path.join(os.tmpdir(), `next-small-step-smoke-${token}`);
 const output = path.join(__dirname, '.qa');

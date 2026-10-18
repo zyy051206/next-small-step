@@ -1,6 +1,8 @@
 # 下一小步 · Windows
 
-双击 `next-small-step-2.0.0-windows-x64.exe` 即可运行，无需安装 Node.js、浏览器扩展或本地服务器。支持 Windows 10/11 x64。网页资源随 EXE 打包，离线可用。
+双击 `next-small-step-2.0.1-windows-x64.exe` 即可运行，无需安装 Node.js、浏览器扩展或本地服务器。支持 Windows 10/11 x64。网页资源随 EXE 打包，离线可用。
+
+2.0.1 移除了顶部的“文件 / 编辑 / 视图”菜单栏，并包含分页布局与最新修复。外观设置支持选择本地背景图片、调整浅色遮罩和自定义应用内图标与 Logo 颜色，重开应用后保留设置。
 
 此版本**未进行 Windows 数字签名**，系统可能显示未知发布者。请从项目所有者提供的发布链接下载，并可核对同目录的 SHA256SUMS.txt。
 
@@ -24,7 +26,7 @@ npm run smoke
 
 固定依赖 Electron 44.9.0、electron-builder 26.17.0，全部间接依赖记录于 `package-lock.json`。构建时从项目自己的 `dist/icon.svg` 生成品牌 ICO，再将同一份 `dist/` 打包为 Windows x64 portable EXE。输出位于 `desktop/release/`。
 
-GitHub 的 **Windows EXE** 工作流会在 Windows runner 构建实际分发的 EXE，然后启动该 EXE 两次，验证离线页面、隔离的渲染环境、目标/计时跨进程持久化、真实 JSON 备份导出/取消与全年统计，成功后才上传 `next-small-step-windows` 附件。`windows-verification` 附件提供检查报告与截图。
+GitHub 的 **Windows EXE** 工作流会在 Windows runner 构建实际分发的 EXE，然后启动该 EXE 两次，验证菜单栏已移除、离线页面、隔离的渲染环境、目标/计时和自定义背景/图标色跨进程持久化、真实 JSON 备份导出/取消与全年统计，成功后才上传 `next-small-step-windows` 附件。`windows-verification` 附件提供检查报告与截图。
 
 开发运行：`npm start`。开发 smoke：`node smoke.cjs --dev`。直接使用 `--smoke-test` 启动 EXE 也会建立独立临时数据目录，不会读取或修改真实用户进度。测试不清理其他用户文件。
 

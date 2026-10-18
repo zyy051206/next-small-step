@@ -37,7 +37,7 @@ import java.nio.charset.StandardCharsets;
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + ORIGIN + "/assets/index.html";
-    private static final int OPEN_BACKUP = 10;
+    private static final int OPEN_DOCUMENT = 10;
     private static final int SAVE_BACKUP = 11;
     private static final int MAX_BACKUP_BYTES = 20_000_000;
     private WebView webView;
@@ -107,12 +107,12 @@ public final class MainActivity extends Activity {
                 fileCallback = callback;
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
-                // Some Android file providers identify JSON as plain text or octet-stream.
-                // The web app validates size, JSON and schema before replacing anything.
-                intent.setType("*/*");
+                // Only show images for the background picker. JSON imports keep a
+                // broad filter because providers can label them as plain text.
+                intent.setType(filePickerType(params.getAcceptTypes()));
                 intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false);
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                try { startActivityForResult(intent, OPEN_BACKUP); }
+                try { startActivityForResult(intent, OPEN_DOCUMENT); }
                 catch (ActivityNotFoundException error) {
                     fileCallback.onReceiveValue(null);
                     fileCallback = null;
@@ -126,6 +126,17 @@ public final class MainActivity extends Activity {
         }
         // A fresh page reads the persisted state and settles elapsed timers itself.
         webView.loadUrl(START_URL);
+    }
+
+    static String filePickerType(String[] acceptTypes) {
+        if (acceptTypes == null || acceptTypes.length == 0) return "*/*";
+        for (String group : acceptTypes) {
+            if (group == null || group.trim().isEmpty()) return "*/*";
+            for (String type : group.split(",")) {
+                if (!type.trim().startsWith("image/")) return "*/*";
+            }
+        }
+        return "image/*";
     }
 
     private static boolean isLocalAsset(Uri uri) {
@@ -182,7 +193,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == OPEN_BACKUP) {
+        if (requestCode == OPEN_DOCUMENT) {
             if (fileCallback == null) return;
             Uri uri = resultCode == RESULT_OK && data != null ? data.getData() : null;
             // Accept only a one-time document URI selected by the user.

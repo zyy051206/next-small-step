@@ -43,11 +43,13 @@ jobs:
       - name: Prepare download and checksum
         run: |
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-          Copy-Item -LiteralPath release/next-small-step-2.0.0-windows-x64.exe -Destination artifacts/
-          $artifact = Get-Item -LiteralPath artifacts/next-small-step-2.0.0-windows-x64.exe
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $artifactName = "next-small-step-$version-windows-x64.exe"
+          Copy-Item -LiteralPath "release/$artifactName" -Destination artifacts/
+          $artifact = Get-Item -LiteralPath "artifacts/$artifactName"
           $checksum = (Get-FileHash -LiteralPath $artifact.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$checksum  $($artifact.Name)" | Set-Content -LiteralPath artifacts/SHA256SUMS.txt -Encoding utf8
-          @{ version = '2.0.0'; commit = $env:GITHUB_SHA; platform = 'windows'; arch = 'x64'; file = $artifact.Name; sha256 = $checksum } | ConvertTo-Json | Set-Content -LiteralPath artifacts/build-info.json -Encoding utf8
+          @{ version = $version; commit = $env:GITHUB_SHA; platform = 'windows'; arch = 'x64'; file = $artifact.Name; sha256 = $checksum } | ConvertTo-Json | Set-Content -LiteralPath artifacts/build-info.json -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:
           name: next-small-step-windows

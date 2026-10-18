@@ -25,7 +25,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'nextstep', privileges: {
 } }]);
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json' };
-const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
+const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
 let window;
 let smokeDownloadMode = 'save';
 const pageErrors = [];
@@ -94,6 +94,7 @@ async function configureSession() {
 }
 
 async function createWindow() {
+  Menu.setApplicationMenu(null);
   window = new BrowserWindow({
     width: 1360, height: 900, minWidth: 860, minHeight: 640,
     title: '下一小步', backgroundColor: '#f5f4ed', show: false,
@@ -111,13 +112,6 @@ async function createWindow() {
   window.webContents.on('will-attach-webview', event => event.preventDefault());
   window.webContents.on('preload-error', (_event, _file, error) => pageErrors.push(error.message));
   if (smoke) window.webContents.on('console-message', details => { if (details.level === 'error') pageErrors.push(details.message); });
-  Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: '文件', submenu: [{ label: '退出', role: 'quit' }] },
-    { label: '编辑', submenu: [{ label: '撤销', role: 'undo' }, { label: '重做', role: 'redo' }, { type: 'separator' },
-      { label: '剪切', role: 'cut' }, { label: '复制', role: 'copy' }, { label: '粘贴', role: 'paste' }, { label: '全选', role: 'selectAll' }] },
-    { label: '视图', submenu: [{ label: '重新载入', role: 'reload' }, { type: 'separator' },
-      { label: '放大', role: 'zoomIn' }, { label: '缩小', role: 'zoomOut' }, { label: '实际大小', role: 'resetZoom' }, { label: '全屏', role: 'togglefullscreen' }] }
-  ]));
   await window.loadURL(START_URL);
   await painted;
   if (!smoke) window.show();
@@ -136,16 +130,23 @@ async function waitFor(script, label) {
 
 async function runSmoke() {
   const checks = [];
+  if (Menu.getApplicationMenu() !== null || window.isMenuBarVisible()) throw new Error('The desktop menu bar must stay removed');
+  checks.push('native file, edit and view menus are removed');
   const evaluate = script => window.webContents.executeJavaScript(script);
   async function check(script, label) {
     if (!await evaluate(script)) throw new Error(label);
     checks.push(label);
   }
   await waitFor("document.readyState==='complete' && typeof StepCore==='object' && typeof document.querySelector('#new-goal')?.onclick==='function' && document.querySelectorAll('#annual-chart .month-column').length===12", 'application readiness');
+  await waitFor("typeof StepAppearance==='object'", 'appearance initialization');
+  await evaluate('StepAppearance.ready');
   await check("location.origin==='nextstep://app' && typeof NextStepDesktop==='object'", 'stable local origin and desktop marker');
   await check("typeof require==='undefined' && typeof process==='undefined'", 'renderer has no Node access');
   await check("!!document.querySelector('#planner') && !!document.querySelector('#important-dates')", 'calendar and important-date panels loaded');
   if (smokePhase === 'seed' || smokePhase === 'full') {
+    await evaluate("new Promise(resolve=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;const context=canvas.getContext('2d');context.fillStyle='#f4eee2';context.fillRect(0,0,2,2);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'native-background.png',{type:'image/png'}));const input=document.querySelector('#appearance-bg-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-icon-color=\"#7054a4\"]').click();resolve(true);});})");
+    await waitFor("document.body.classList.contains('has-custom-background') && document.querySelector('#appearance-bg-preview').naturalWidth===2", 'local background saved through the appearance UI');
+    await check("document.querySelector('#appearance-bg-name').textContent==='native-background.png' && document.documentElement.style.getPropertyValue('--icon-color')==='#7054a4'", 'local background and icon color are set through the UI');
     await evaluate("document.querySelector('#new-goal').click();document.querySelector('#goal-name').value='桌面启动验证';document.querySelector('#goal-steps').value='完成一次真实计时';document.querySelector('#goal-form').requestSubmit();document.querySelector('[data-minutes=\"10\"]').click();document.querySelector('#timer-start').click()");
     await check("JSON.parse(localStorage.getItem(StepCore.key)).timer?.status==='running'", 'goal, action and running timer created through UI');
     fs.writeFileSync(path.join(smokeRoot, 'expected.json'), JSON.stringify(await evaluate("({endsAt:JSON.parse(localStorage.getItem(StepCore.key)).timer.endsAt})")));
@@ -161,9 +162,14 @@ async function runSmoke() {
     if (smokePhase === 'full') {
       await window.loadURL(START_URL);
       await waitFor("typeof StepCore==='object' && !!document.querySelector('#goal-title')?.textContent", 'reloaded application');
+      await waitFor("typeof StepAppearance==='object'", 'reloaded appearance');
+      await evaluate('StepAppearance.ready');
     }
   }
   if (smokePhase === 'verify' || smokePhase === 'full') {
+    await waitFor("document.body.classList.contains('has-custom-background') && document.querySelector('#appearance-bg-preview').naturalWidth===2", 'background restored from IndexedDB after restarting');
+    await check("document.querySelector('#appearance-bg-name').textContent==='native-background.png' && document.querySelector('#appearance-bg-preview').src.startsWith('blob:nextstep://app/')", 'local background survives a full application restart');
+    await check("document.documentElement.style.getPropertyValue('--icon-color')==='#7054a4'", 'custom icon color survives a full application restart');
     const expected = JSON.parse(fs.readFileSync(path.join(smokeRoot, 'expected.json'), 'utf8'));
     await check("document.querySelector('#goal-title').textContent==='桌面启动验证'", 'goal survives full application restart');
     await check(`JSON.parse(localStorage.getItem(StepCore.key)).timer?.endsAt===${expected.endsAt}`, 'timer deadline survives restart');

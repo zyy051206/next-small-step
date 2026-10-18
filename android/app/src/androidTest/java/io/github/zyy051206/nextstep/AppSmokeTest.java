@@ -19,6 +19,15 @@ import static org.junit.Assert.assertTrue;
 /** Runs against the bundled page on a real Android WebView, not a browser mock. */
 @RunWith(AndroidJUnit4.class)
 public final class AppSmokeTest {
+    @Test public void imagePickerFiltersImagesWithoutRestrictingBackupProviders() {
+        assertEquals("image/*", MainActivity.filePickerType(new String[]{"image/*"}));
+        assertEquals("image/*", MainActivity.filePickerType(new String[]{"image/png,image/jpeg", "image/webp"}));
+        assertEquals("*/*", MainActivity.filePickerType(new String[]{"application/json", ".json"}));
+        assertEquals("*/*", MainActivity.filePickerType(new String[]{"image/*", "application/json"}));
+        assertEquals("*/*", MainActivity.filePickerType(new String[]{""}));
+        assertEquals("*/*", MainActivity.filePickerType(null));
+    }
+
     private String evaluate(ActivityScenario<MainActivity> scenario, String script) throws Exception {
         AtomicReference<String> result = new AtomicReference<>();
         CountDownLatch done = new CountDownLatch(1);
@@ -33,7 +42,14 @@ public final class AppSmokeTest {
     private void awaitPage(ActivityScenario<MainActivity> scenario) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + 20_000;
         while (SystemClock.elapsedRealtime() < deadline) {
-            if ("true".equals(evaluate(scenario, "document.readyState==='complete' && typeof StepCore==='object' && typeof StepStats==='object' && typeof document.getElementById('new-goal').onclick==='function' && document.querySelectorAll('#monthly-table-body tr').length===12"))) return;
+            if ("true".equals(evaluate(scenario, "document.readyState==='complete' && typeof StepCore==='object' && typeof StepStats==='object' && typeof StepAppearance==='object' && typeof document.getElementById('new-goal').onclick==='function' && document.querySelectorAll('#monthly-table-body tr').length===12"))) {
+                evaluate(scenario, "window.nativeAppearanceReady=false;StepAppearance.ready.then(()=>{window.nativeAppearanceReady=true})");
+                while (SystemClock.elapsedRealtime() < deadline) {
+                    if ("true".equals(evaluate(scenario, "window.nativeAppearanceReady"))) return;
+                    SystemClock.sleep(100);
+                }
+                throw new AssertionError("Local appearance storage did not finish loading");
+            }
             SystemClock.sleep(150);
         }
         throw new AssertionError("Bundled page did not finish loading");
@@ -45,6 +61,10 @@ public final class AppSmokeTest {
             assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
             assertEquals("\"function\"", evaluate(scenario, "typeof NextStepAndroid.saveBackup"));
             assertEquals("true", evaluate(scenario, "document.body.textContent.includes('下一小步')"));
+            evaluate(scenario, "{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;canvas.getContext('2d').fillRect(0,0,2,2);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'android-background.png',{type:'image/png'}));const input=document.getElementById('appearance-bg-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-icon-color=\"#7054a4\"]').click();});}");
+            long backgroundDeadline = SystemClock.elapsedRealtime() + 8_000;
+            while (SystemClock.elapsedRealtime() < backgroundDeadline && !"true".equals(evaluate(scenario, "document.body.classList.contains('has-custom-background') && document.getElementById('appearance-bg-preview').naturalWidth===2"))) SystemClock.sleep(100);
+            assertEquals("true", evaluate(scenario, "document.body.classList.contains('has-custom-background') && document.getElementById('appearance-bg-preview').naturalWidth===2"));
             // Exercise the actual goal and timer UI, then reconstruct the Activity.
             evaluate(scenario, "document.getElementById('new-goal').click();document.getElementById('goal-name').value='Android smoke goal';document.getElementById('goal-steps').value='Verify a real focus session';document.getElementById('goal-form').requestSubmit();document.querySelector('[data-minutes=\"10\"]').click();document.getElementById('timer-start').click();");
             assertEquals("true", evaluate(scenario, "JSON.parse(localStorage.getItem(StepCore.key)).timer.status==='running' && document.getElementById('focus-state').textContent==='正在专注'"));
@@ -52,13 +72,20 @@ public final class AppSmokeTest {
             SystemClock.sleep(1200);
             scenario.recreate();
             awaitPage(scenario);
+            long restoredDeadline = SystemClock.elapsedRealtime() + 8_000;
+            while (SystemClock.elapsedRealtime() < restoredDeadline && !"true".equals(evaluate(scenario, "document.getElementById('appearance-bg-preview').naturalWidth===2"))) SystemClock.sleep(100);
+            assertEquals("true", evaluate(scenario, "document.body.classList.contains('has-custom-background') && document.getElementById('appearance-bg-name').textContent==='android-background.png' && document.getElementById('appearance-bg-preview').naturalWidth===2"));
+            assertEquals("\"#7054a4\"", evaluate(scenario, "document.documentElement.style.getPropertyValue('--icon-color')"));
             assertEquals("\"Android smoke goal\"", evaluate(scenario, "document.getElementById('goal-title').textContent"));
             assertEquals("true", evaluate(scenario, "JSON.parse(localStorage.getItem(StepCore.key)).goals[0].steps[0].text==='Verify a real focus session'"));
             assertEquals(deadline, evaluate(scenario, "JSON.parse(localStorage.getItem(StepCore.key)).timer.endsAt"));
             assertEquals("true", evaluate(scenario, "document.getElementById('focus-state').textContent==='正在专注' && StepCore.remaining(JSON.parse(localStorage.getItem(StepCore.key)).timer)<599000"));
             assertEquals("12", evaluate(scenario, "document.querySelectorAll('#monthly-table-body tr').length"));
             assertEquals("12", evaluate(scenario, "document.querySelectorAll('#annual-chart .month-column').length"));
-            evaluate(scenario, "localStorage.removeItem(StepCore.key)");
+            evaluate(scenario, "document.getElementById('appearance-bg-remove').click();localStorage.removeItem('next-small-step.appearance.v1');localStorage.removeItem(StepCore.key)");
+            long cleanupDeadline = SystemClock.elapsedRealtime() + 8_000;
+            while (SystemClock.elapsedRealtime() < cleanupDeadline && !"false".equals(evaluate(scenario, "document.body.classList.contains('has-custom-background')"))) SystemClock.sleep(100);
+            assertEquals("false", evaluate(scenario, "document.body.classList.contains('has-custom-background')"));
         }
     }
 
