@@ -100,7 +100,6 @@
       }
     }
     lastDay = today;
-    render(bridge.getState());
   }
 
   function init(api) {
@@ -164,11 +163,6 @@
       event.preventDefault();
       if (date.getFullYear() >= 1 && date.getFullYear() <= 9999) chooseDay(dateKey(date), true);
     });
-    // Recalculate date-based views after midnight and after returning to the app.
-    // No notifications or background permissions are required.
-    setInterval(refreshDay, 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshDay(); });
-    window.addEventListener('nextstep-resume', refreshDay);
   }
 
   function renderCalendar() {
@@ -338,6 +332,8 @@
 
   function render(nextState) {
     if (!ready) return;
+    // The app's shared day-change refresh keeps all pages on the same local day.
+    refreshDay();
     state = nextState;
     renderCalendar(); renderAgenda(); renderDates();
   }

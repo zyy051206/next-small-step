@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const C = StepCore, $ = id => document.getElementById(id);
-  let state = C.initial(), editId = null, confirmation = null, toastTimeout, storageBlocked = false;
+  let state = C.initial(), editId = null, confirmation = null, toastTimeout, storageBlocked = false, displayedDay = null;
   const text = (tag, value, cls) => { const el = document.createElement(tag); el.textContent = value; if (cls) el.className = cls; return el; };
   const button = (label, cls, action, aria) => { const el = text('button', label, cls); el.type = 'button'; el.onclick = action; if (aria) el.setAttribute('aria-label', aria); return el; };
   const getGoal = () => state.goals.find(g => g.id === state.selectedGoal);
@@ -118,7 +118,14 @@
       row.append(description, text('span', s.seconds < 60 ? `${s.seconds} 秒` : `${Math.floor(s.seconds / 60)} 分 ${Math.floor(s.seconds % 60)} 秒`)); $('history-list').append(row);
     }
   }
-  function render() { renderGoals(); renderSteps(); drawTimer(); renderStats(); window.StepPlanner?.render(state); }
+  function refreshDateHeading() {
+    const now = new Date(), today = C.dayKey(now);
+    if (today === displayedDay) return false;
+    displayedDay = today;
+    $('today-label').textContent = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + '  /  A FRESH START';
+    return true;
+  }
+  function render() { refreshDateHeading(); renderGoals(); renderSteps(); drawTimer(); renderStats(); window.StepPlanner?.render(state); }
   function openGoal(id = null) { if (!id && state.goals.length >= 100) { toast('最多保留 100 个目标，请先整理已有目标。'); return; } editId = id; const g = state.goals.find(g => g.id === id); $('goal-form').reset(); $('goal-error').textContent = ''; $('goal-dialog-title').textContent = g ? '给目标一点调整。' : '你想让什么发生？'; $('goal-name').value = g?.title || ''; $('goal-reason').value = g?.why || ''; $('new-steps-fields').hidden = !!g; $('goal-dialog').showModal(); $('goal-name').focus(); }
   $('new-goal').onclick = () => openGoal(); $('empty-create').onclick = () => openGoal(); $('edit-goal').onclick = () => openGoal(state.selectedGoal);
   $('goal-form').onsubmit = e => {
@@ -200,8 +207,13 @@
   $('timer-reset').onclick = () => { if (!state.timer) return; confirmAction('重新开始计时？', '这一段未结束的计时不会计入记录；任务和完成状态保持不变。', () => { state.timer = null; save(); drawTimer(); toast('已重置，可以重新开始。'); }); };
   $('finish-step').onclick = () => { const g = getGoal(), s = getStep(); if (g && s) completeStep(g, s); };
   function tick() {
+    const dayChanged = refreshDateHeading();
     if (state.timer?.status === 'running' && C.remaining(state.timer) <= 0) { const end = state.timer.endsAt, result = settleSession(end); save(); render(); toast(result.kind === 'focus' ? `这一段专注已记下。准备好后，开始${state.mode === 'longBreak' ? '长' : '短'}休息。` : '休息结束了。选好下一件事，再开始专注。'); }
-    else drawTimer();
+    else {
+      drawTimer();
+      // Refresh date-dependent views once per day without resetting form drafts.
+      if (dayChanged) { renderSteps(); renderStats(); window.StepPlanner?.render(state); }
+    }
   }
   function download(contents, name) {
     if (window.NextStepAndroid?.saveBackup) {
@@ -240,7 +252,6 @@
     const dataHelp = document.querySelector('.guide-list li:last-child p');
     if (dataHelp) dataHelp.textContent = '应用数据保存在本机，不同设备和网页之间不会自动同步。使用导出、导入备份迁移记录；清除应用数据前请先备份。离开应用后仍按时钟计算，回来时补记已结束的单段计时；不会自动循环或在后台发出到时通知。';
   }
-  $('today-label').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + '  /  A FRESH START';
   window.StepApp = { getState: () => state, saveAndRender: () => { save(); render(); }, confirm: confirmAction, toast, completeStep, selectTask, editTask, addTask };
   window.StepPlanner?.init(window.StepApp);
   render(); tick(); setInterval(tick, 1000);

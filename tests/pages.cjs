@@ -104,6 +104,23 @@ const server = createServer((req, res) => {
     assert(await ev(active('workspace')), 'opening without a hash starts at the workspace');
     assert(await ev("document.querySelector('#ongoing-focus').hidden || !document.querySelector('#ongoing-focus').getClientRects().length"), 'no ongoing-timer shortcut is shown before a timer exists');
 
+    const emptyState = await ev('JSON.stringify(StepApp.getState())');
+    await navigate('important-dates'); await click('#dates-add');
+    await ev("document.querySelector('#date-title').value='尚未保存的日期';StepPages.show('important-dates')");
+    assert(await ev("document.querySelector('#date-dialog').open && document.querySelector('#date-title').value==='尚未保存的日期' && document.activeElement.id==='date-title'"), 'showing the same page preserves its open editor and draft');
+    await ev('history.back()'); await waitFor(active('workspace'), 'leave date editor through browser Back');
+    assert(await ev(`!document.querySelector('dialog[open]') && document.activeElement.id==='workspace-title' && JSON.stringify(StepApp.getState())===${JSON.stringify(emptyState)}`), 'browser Back closes the date editor and focuses its destination without saving the draft');
+    await ev('history.forward()'); await waitFor(active('important-dates'), 'return after cancelling date editor');
+    assert(await ev("!document.querySelector('dialog[open]') && document.activeElement.id==='dates-title'"), 'browser Forward returns to the date page without reopening a cancelled editor');
+    await navigate('workspace'); await click('#new-goal');
+    await ev("document.querySelector('#goal-name').value='尚未保存的目标';document.querySelector('#goal-steps').value='保留原始草稿'");
+    await click('[data-template="learn"]');
+    assert(await ev("document.querySelector('#goal-dialog').open && document.querySelector('#confirm-dialog').open"), 'replacing a goal draft opens a confirmation above its editor');
+    await ev('history.back()'); await waitFor(active('important-dates'), 'leave nested dialogs through browser Back');
+    assert(await ev(`!document.querySelector('dialog[open]') && document.activeElement.id==='dates-title' && document.querySelector('#goal-steps').value==='保留原始草稿' && JSON.stringify(StepApp.getState())===${JSON.stringify(emptyState)}`), 'navigation cancels both nested dialogs without applying the template or saving a goal');
+    await ev('history.forward()'); await waitFor(active('workspace'), 'return after cancelling nested dialogs');
+    assert(await ev("!document.querySelector('dialog[open]') && document.activeElement.id==='workspace-title'"), 'browser Forward restores workspace focus after nested dialogs were cancelled');
+
     for (const width of [1440, 390, 320]) {
       await viewport(width);
       for (const page of pages) {
@@ -130,6 +147,13 @@ const server = createServer((req, res) => {
       await click('#quick-task-open');
       await ev(`document.querySelector('#task-title').value=${JSON.stringify(title)};document.querySelector('#task-date').value=StepCore.dayKey(Date.now());document.querySelector('#task-form').requestSubmit()`);
     }
+    await navigate('footprints'); await navigate('workspace');
+    const beforeCancelledDelete = await ev('JSON.stringify(StepApp.getState())');
+    await click('.goal-delete');
+    await ev('history.back()'); await waitFor(active('footprints'), 'leave deletion confirmation through browser Back');
+    assert(await ev(`!document.querySelector('dialog[open]') && document.activeElement.id==='footprint-title' && JSON.stringify(StepApp.getState())===${JSON.stringify(beforeCancelledDelete)}`), 'browser Back cancels goal deletion without changing any saved records');
+    await ev('history.forward()'); await waitFor(active('workspace'), 'return after cancelling deletion');
+    assert(await ev(`!document.querySelector('dialog[open]') && JSON.stringify(StepApp.getState())===${JSON.stringify(beforeCancelledDelete)}`), 'browser Forward does not restore or execute the cancelled deletion');
     await navigate('planner'); await click('.planner-task-title');
     assert(await ev(`${active('workspace')} && document.querySelector('#focus-task').textContent==='整理作品的第一版说明'`), 'choosing a calendar task opens its focus workspace');
     await click('[data-minutes="10"]'); await click('#timer-start');

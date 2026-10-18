@@ -146,3 +146,18 @@ test('returning after a long absence settles only the original interval at its o
   assert.equal(data.sessions.length, 1); assert.equal(data.sessions[0].seconds, 1500); assert.equal(data.sessions[0].finishedAt, 10000000);
   assert.equal(data.pomodoroCount, 1); assert.equal(data.timer, null); assert.equal(data.mode, 'shortBreak');
 });
+
+test('accepted long-term history remains readable after another focus session without truncation', () => {
+  const data = fixture();
+  data.sessions = Array.from({ length: 50000 }, (_, i) => ({ id: `history-${i}`, goalTitle: '历史目标', stepTitle: '历史行动', finishedAt: 1000000 + i, seconds: 60 }));
+  const restored = C.validate(JSON.parse(JSON.stringify(data)));
+  activeTimer(restored);
+  C.settleTimer(restored, 10000000);
+  const reloaded = C.validate(JSON.parse(JSON.stringify(restored)));
+  assert.equal(reloaded.sessions.length, 50001);
+  assert.deepEqual(reloaded.sessions.slice(0, 50000), data.sessions);
+  assert.equal(reloaded.sessions[50000].seconds, 1500);
+  assert.equal(reloaded.sessions[50000].finishedAt, 10000000);
+  assert.equal(reloaded.pomodoroCount, 1);
+  assert.equal(reloaded.timer, null);
+});

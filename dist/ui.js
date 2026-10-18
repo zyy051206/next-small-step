@@ -19,6 +19,10 @@
   }
 
   function render(id, { focus = true, focusTarget } = {}) {
+    if (current !== id) {
+      // Cancel editors and pending confirmations before hiding their page.
+      [...document.querySelectorAll('dialog[open]')].reverse().forEach(dialog => dialog.close());
+    }
     current = id;
     pages.forEach(page => { page.hidden = page.id !== id; });
     links.forEach(link => {

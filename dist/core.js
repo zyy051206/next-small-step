@@ -34,7 +34,7 @@
     const finite = v => typeof v === 'number' && Number.isFinite(v);
     const timestamp = v => finite(v) && Math.abs(v) <= 8640000000000000;
     const whole = (v, min, max) => Number.isSafeInteger(v) && v >= min && v <= max;
-    if (!data || ![1, VERSION].includes(data.version) || !Array.isArray(data.goals) || !Array.isArray(data.sessions) || data.goals.length > 100 || data.sessions.length > 50000) fail();
+    if (!data || ![1, VERSION].includes(data.version) || !Array.isArray(data.goals) || !Array.isArray(data.sessions) || data.goals.length > 100) fail();
     const legacy = data.version === 1;
     let dates = [], preferences = { shortBreak: 5, longBreak: 15, cycles: 4 }, pomodoroCount = 0, mode = 'focus';
     if (!legacy) {

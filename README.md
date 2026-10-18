@@ -80,6 +80,7 @@ node --test tests/core.test.cjs tests/planner.test.cjs
 ```sh
 node tests/browser.cjs
 node tests/pages.cjs
+node tests/day-rollover.cjs
 ```
 
 浏览器测试使用 Edge 的默认安装路径 `C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`，并通过 CDP 检查真实交互；若 Edge 安装位置不同，需要调整 `tests/browser.cjs` 中的路径。测试使用 `.qa/` 下的隔离浏览器目录，不访问个人浏览器数据。
