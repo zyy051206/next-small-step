@@ -75,7 +75,15 @@ public class HomeWidgetsTest {
             String suffix=HomeWidgets.snapshot(context).optString("theme").equals("dark")?"-dark":"";
             try(FileOutputStream output=new FileOutputStream(new File(context.getFilesDir(),"widget-"+type.getSimpleName().toLowerCase(java.util.Locale.ROOT)+suffix+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
             result.set(view);}catch(Exception e){error.set(e);}});
-        if(error.get()!=null) throw error.get(); return result.get();
+        if(error.get()!=null) throw error.get();
+        // Gradle uninstalls test apps at teardown. Keep only these synthetic previews in
+        // the emulator's public Downloads directory before the app-private files disappear.
+        String suffix=HomeWidgets.snapshot(context).optString("theme").equals("dark")?"-dark":"";
+        String file="widget-"+type.getSimpleName().toLowerCase(java.util.Locale.ROOT)+suffix+".png";
+        String directory="/sdcard/Download/next-step-widget-previews";
+        try(android.os.ParcelFileDescriptor command=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("mkdir -p "+directory+" && run-as io.github.zyy051206.nextstep cat files/"+file+" > "+directory+"/"+file);
+            java.io.InputStream output=new android.os.ParcelFileDescriptor.AutoCloseInputStream(command)) {while(output.read()!=-1) { /* Wait for the isolated emulator copy. */ }}
+        return result.get();
     }
     @Test public void remoteViewsInflateAndFocusClockKeepsRunningWithoutWebview() throws Exception {
         JSONObject data=base(); data.put("timer",new JSONObject().put("kind","focus").put("status","running").put("duration",300000).put("remaining",300000).put("endsAt",System.currentTimeMillis()+300000).put("stepId","step"));

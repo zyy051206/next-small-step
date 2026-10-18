@@ -3,6 +3,8 @@ package io.github.zyy051206.nextstep;
 import android.os.SystemClock;
 import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
+import androidx.test.core.app.ApplicationProvider;
+import android.content.Context;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -29,7 +31,10 @@ public class WidgetActionsTest {
         scenario.onActivity(activity -> activity.onNewIntent(HomeWidgets.actionIntent(activity,77,4,command)));
     }
     @Test public void widgetStartPauseResumeAndCompletePersistThroughRecreation() throws Exception {
-        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)) {
+        // ActivityScenario tracks the launch Intent's filter fields. Start through the same
+        // widget deep link as later taps, so setIntent() remains a real Android lifecycle test.
+        Context context=ApplicationProvider.getApplicationContext();
+        try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(HomeWidgets.actionIntent(context,77,4,new JSONObject().put("action","open").put("page","workspace")))) {
             await(scenario,"typeof StepApp==='object' && typeof StepWidgets==='object' && document.readyState==='complete'");
             evaluate(scenario,"localStorage.setItem(StepCore.key,JSON.stringify(StepCore.initial()));location.reload()");
             await(scenario,"typeof StepApp==='object' && document.readyState==='complete' && StepApp.getState().goals.length===0");
