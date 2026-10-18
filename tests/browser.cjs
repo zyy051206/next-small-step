@@ -13,13 +13,13 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
  await new Promise(r => server.listen(0, '127.0.0.1', r));
  const url = `http://127.0.0.1:${server.address().port}/`;
  const profile = path.join(qa, 'browser-' + Date.now());
- const browser = spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', ['--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19347', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+ const browser = spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', ['--headless=new', '--disable-extensions', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19347', '--user-data-dir=' + profile, 'about:blank'], { windowsHide: true, stdio: 'ignore' });
  let ws, count = 0;
  try {
   let tabs;
   for (let n = 0; n < 20; n++) { try { tabs = await (await fetch('http://127.0.0.1:19347/json/list', { signal: AbortSignal.timeout(1000) })).json(); break; } catch { await delay(250); } }
   if (!tabs) throw Error('Headless Edge unavailable');
-  ws = new WebSocket(tabs.find(t => t.type === 'page').webSocketDebuggerUrl);
+  ws = new WebSocket(tabs.find(t => t.type === 'page' && t.url === 'about:blank').webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
   let id = 0; const pending = new Map(), errors = [];
   ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id) { pending.get(m.id)?.(m); pending.delete(m.id); } else if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text); };
@@ -39,8 +39,8 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
    await cdp('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: currentDownload });
    await ev("document.querySelector('#export-data').click()");
    for (let n = 0; n < 50; n++) {
-    const name = fs.readdirSync(currentDownload).find(n => n.startsWith('下一小步-备份-') && n.endsWith('.json'));
-    if (name) { const file = path.join(currentDownload, name); try { return { file, data: JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {} }
+    const name = fs.readdirSync(currentDownload).find(n => n.startsWith('下一小步-完整备份-') && n.endsWith('.json'));
+    if (name) { const file = path.join(currentDownload, name); try { const full=JSON.parse(fs.readFileSync(file,'utf8')); return {file,full,data:full.data||full}; } catch {} }
     await delay(100);
    }
    throw Error('This run did not download a fresh JSON backup');
@@ -92,7 +92,7 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
   await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
   assert(await ev("!document.querySelector('#goal-dialog').open"), 'Escape dismisses modal');
   const exported = await exportBackup();
-  assert(exported.data.version === 2 && exported.data.sessions.length === 1, 'fresh downloaded backup contains version-two state and real records');
+  assert(exported.full.format === 'next-small-step.full-backup' && exported.data.version === 2 && exported.data.sessions.length === 1, 'fresh downloaded backup contains version-two state and real records');
   const backup = exported.file;
   const inputFile = async file => { const doc = await cdp('DOM.getDocument'); const { nodeId } = await cdp('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#import-file' }); await cdp('DOM.setFileInputFiles', { nodeId, files: [file] }); await delay(150); };
   fs.writeFileSync(path.join(qa, 'invalid.json'), '{"version":999}');
@@ -218,11 +218,14 @@ const server = createServer((req, res) => { try { const file = req.url === '/' ?
 
   // Exercise the native export contract without writing to an Android device or user profile.
   await ev("window.nativeBackupCalls=[];window.NextStepAndroid={saveBackup:(contents,name)=>window.nativeBackupCalls.push({contents,name})};document.querySelector('#export-data').click()");
-  assert(await ev("nativeBackupCalls.length===1 && JSON.parse(nativeBackupCalls[0].contents).version===2 && JSON.stringify(JSON.parse(nativeBackupCalls[0].contents))===JSON.stringify(JSON.parse(localStorage.getItem(StepCore.key))) && nativeBackupCalls[0].name.endsWith('.json')"), 'Android export bridge receives the unmodified version-two JSON and backup filename');
+  await waitFor('nativeBackupCalls.length===1');
+  assert(await ev("nativeBackupCalls.length===1 && JSON.parse(nativeBackupCalls[0].contents).data.version===2 && JSON.stringify(JSON.parse(nativeBackupCalls[0].contents).data)===JSON.stringify(JSON.parse(localStorage.getItem(StepCore.key))) && nativeBackupCalls[0].name.endsWith('.json')"), 'Android export bridge receives the unmodified version-two JSON and backup filename');
   assert(await ev("!document.querySelector('#toast').hidden && document.querySelector('#toast').textContent==='请选择备份的保存位置。'"), 'Android export waits for the save result instead of claiming early success');
   await ev("window.dispatchEvent(new CustomEvent('nextstep-backup-result',{detail:{status:'success'}}))");
   assert(await ev("document.querySelector('#toast').textContent==='备份已保存，可以用它迁移到其他设备。'"), 'Android successful save event displays the completion message');
-  await ev("document.querySelector('#export-data').click();window.dispatchEvent(new CustomEvent('nextstep-backup-result',{detail:{status:'cancelled'}}))");
+  await ev("document.querySelector('#export-data').click()");
+  await waitFor('nativeBackupCalls.length===2');
+  await ev("window.dispatchEvent(new CustomEvent('nextstep-backup-result',{detail:{status:'cancelled'}}))");
   assert(await ev("document.querySelector('#toast').textContent==='已取消保存，当前数据没有改变。' && JSON.parse(localStorage.getItem(StepCore.key)).sessions.length===7"), 'Android cancelled save event keeps all data and reports cancellation');
   await ev("delete window.NextStepAndroid;delete window.nativeBackupCalls");
   await ev("localStorage.setItem(StepCore.key,'broken json')"); await reload();

@@ -39,7 +39,7 @@ public final class MainActivity extends Activity {
     private static final String START_URL = "https://" + ORIGIN + "/assets/index.html";
     private static final int OPEN_DOCUMENT = 10;
     private static final int SAVE_BACKUP = 11;
-    private static final int MAX_BACKUP_BYTES = 20_000_000;
+    private static final int MAX_BACKUP_BYTES = 64 * 1024 * 1024;
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
     private volatile boolean exportPending;
@@ -85,6 +85,7 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         webView.addJavascriptInterface(new BackupBridge(), "NextStepAndroid");
+        webView.addJavascriptInterface(new FocusReminder.Bridge(this), "NextStepReminders");
         updater = new AppUpdater(this, detail -> {
             pendingUpdateResult = detail.toString();
             dispatchUpdateResult();
@@ -137,6 +138,12 @@ public final class MainActivity extends Activity {
         webView.loadUrl(START_URL);
     }
 
+
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
+        super.onRequestPermissionsResult(code,permissions,results);
+        if(code==2401 && webView!=null) webView.evaluateJavascript("window.dispatchEvent(new Event('nextstep-reminder-permission'))",null);
+    }
+
     static String filePickerType(String[] acceptTypes) {
         if (acceptTypes == null || acceptTypes.length == 0) return "*/*";
         for (String group : acceptTypes) {
@@ -177,7 +184,7 @@ public final class MainActivity extends Activity {
                 return;
             }
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            if (bytes.length > MAX_BACKUP_BYTES) { reportBackup("error", "备份文件超过 20 MB。"); return; }
+            if (bytes.length > MAX_BACKUP_BYTES) { reportBackup("error", "备份文件超过 64 MB。"); return; }
             exportPending = true;
             // JavascriptInterface runs off the UI thread. Keep a private pending copy
             // so the picker can survive the activity being recreated by Android.

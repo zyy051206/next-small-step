@@ -14,6 +14,10 @@
   dialog.innerHTML = `
     <div class="dialog-heading"><span class="eyebrow">MAKE IT YOURS</span><button type="button" class="close-button" aria-label="关闭外观设置">×</button></div>
     <h2 id="appearance-title">给日常一点自己的颜色</h2>
+    <section class="appearance-section">
+      <h3>显示</h3><label for="appearance-theme">主题</label><select id="appearance-theme"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select>
+      <div class="appearance-range-label"><label for="appearance-font">字号</label><output id="appearance-font-value">100%</output></div><input id="appearance-font" type="range" min="90" max="130" step="10" value="100">
+    </section>
     <section class="appearance-section" aria-labelledby="appearance-background-title">
       <div class="appearance-section-heading"><h3 id="appearance-background-title">背景图片</h3><p>选一张喜欢的图片，留在每次开始的地方。</p></div>
       <div class="appearance-preview"><img id="appearance-bg-preview" alt="当前背景预览" hidden><span class="appearance-empty-preview">现在使用默认背景</span></div>
@@ -21,9 +25,9 @@
       <div class="appearance-file-actions"><button type="button" id="appearance-bg-choose" class="button secondary">选择图片</button><button type="button" id="appearance-bg-remove" class="text-button" disabled>恢复默认背景</button></div>
       <input type="file" id="appearance-bg-file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" hidden>
       <p class="appearance-note">支持 JPG、PNG、WebP、GIF 和 AVIF，单张不超过 20 MB。</p>
-      <div class="appearance-range-label"><label for="appearance-shade">浅色遮罩</label><output id="appearance-shade-value" for="appearance-shade">72%</output></div>
-      <input type="range" id="appearance-shade" min="40" max="95" value="72" step="1">
-      <p class="appearance-note">数值越高，背景越淡，文字越清晰。</p>
+      <div class="appearance-range-label"><label for="appearance-shade">壁纸遮罩</label><output id="appearance-shade-value" for="appearance-shade">72%</output></div>
+      <input type="range" id="appearance-shade" min="0" max="100" value="72" step="1">
+      <p class="appearance-note">数值越高，遮罩越浓。卡片保留不透明底色，确保文字清晰。</p>
     </section>
     <section class="appearance-section" aria-labelledby="appearance-color-title">
       <div class="appearance-section-heading"><h3 id="appearance-color-title">图标与 Logo 颜色</h3><p>选一个常用色，也可以自由调色。</p></div>
@@ -32,14 +36,15 @@
       <button type="button" id="appearance-color-reset" class="text-button">恢复默认颜色</button>
     </section>
     <p id="appearance-status" role="status" aria-live="polite"></p>
-    <p class="appearance-note appearance-storage-note">外观只保存在这台设备，进度备份不包含背景图片。</p>`;
+    <p class="appearance-note appearance-storage-note">外观保存在这台设备；完整备份包含背景图片和全部外观设置。</p>`;
   document.body.append(dialog);
 
   const $ = id => document.getElementById(id);
   const fileInput = $('appearance-bg-file');
   const preview = $('appearance-bg-preview');
   const removeButton = $('appearance-bg-remove');
-  let prefs = { iconColor: DEFAULT_COLOR, shade: DEFAULT_SHADE };
+  let prefs = { iconColor: DEFAULT_COLOR, shade: DEFAULT_SHADE, theme: 'system', fontScale: 100 };
+  const systemTheme = matchMedia('(prefers-color-scheme: dark)');
   let preferenceReadError = false;
   let databasePromise;
   let backgroundURL = null;
@@ -69,7 +74,22 @@
     dialog.querySelector('.appearance-swatches').append(button);
   });
 
+  function normalizePreferences(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) || !/^#[0-9a-f]{6}$/i.test(value.iconColor)
+      || !Number.isInteger(value.shade) || value.shade < 0 || value.shade > 100
+      || !['system', 'light', 'dark'].includes(value.theme ?? 'system')
+      || ![90,100,110,120,130].includes(value.fontScale ?? 100)) throw Error('外观设置格式不正确。');
+    return { iconColor: value.iconColor.toLowerCase(), shade: value.shade, theme: value.theme ?? 'system', fontScale: value.fontScale ?? 100 };
+  }
   function applyPreferences() {
+    const dark = prefs.theme === 'dark' || (prefs.theme === 'system' && systemTheme.matches);
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.style.setProperty('--font-scale', String(prefs.fontScale / 100));
+    root.style.colorScheme = dark ? 'dark' : 'light';
+    $('appearance-theme').value = prefs.theme;
+    $('appearance-font').value = prefs.fontScale;
+    $('appearance-font-value').textContent = prefs.fontScale + '%';
+    document.querySelector('meta[name="theme-color"]').content = dark ? '#17211c' : '#f5f7f4';
     const channels = prefs.iconColor.slice(1).match(/../g).map(value => {
       const channel = parseInt(value, 16) / 255;
       return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -77,7 +97,7 @@
     const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
     root.style.setProperty('--icon-color', prefs.iconColor);
     root.style.setProperty('--icon-foreground', luminance > 0.179 ? '#000000' : '#ffffff');
-    root.style.setProperty('--icon-surface', luminance > 0.3 ? '#34423a' : 'transparent');
+    root.style.setProperty('--icon-surface', luminance > 0.3 ? '#34423a' : dark && luminance < 0.12 ? '#c8dccd' : 'transparent');
     root.style.setProperty('--background-shade', (prefs.shade / 100).toFixed(2));
     $('appearance-icon-color').value = prefs.iconColor;
     $('appearance-color-value').textContent = prefs.iconColor;
@@ -92,12 +112,7 @@
     const saved = localStorage.getItem(PREFS_KEY);
     if (saved) {
       const value = JSON.parse(saved);
-      if (!value || typeof value !== 'object' || Array.isArray(value)
-        || !/^#[0-9a-f]{6}$/i.test(value.iconColor)
-        || !Number.isInteger(value.shade) || value.shade < 40 || value.shade > 95) {
-        throw new Error('Invalid appearance preferences');
-      }
-      prefs = { iconColor: value.iconColor.toLowerCase(), shade: value.shade };
+      prefs = normalizePreferences(value);
     }
   } catch {
     preferenceReadError = true;
@@ -105,9 +120,8 @@
   applyPreferences();
 
   function updatePreferences(change) {
-    const next = { ...prefs, ...change };
-    if (!/^#[0-9a-f]{6}$/i.test(next.iconColor) || !Number.isInteger(next.shade)
-      || next.shade < 40 || next.shade > 95) return;
+    let next;
+    try { next = normalizePreferences({ ...prefs, ...change }); } catch { return; }
     next.iconColor = next.iconColor.toLowerCase();
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(next));
@@ -259,5 +273,29 @@
   $('appearance-color-reset').addEventListener('click', () => updatePreferences({ iconColor: DEFAULT_COLOR }));
   dialog.querySelector('.close-button').addEventListener('click', () => dialog.close());
   $('appearance-open').addEventListener('click', () => dialog.showModal());
-  window.StepAppearance = Object.freeze({ ready });
+  systemTheme.addEventListener('change', applyPreferences);
+  $('appearance-theme').addEventListener('change', e => updatePreferences({ theme: e.target.value }));
+  $('appearance-font').addEventListener('input', e => updatePreferences({ fontScale: Number(e.target.value) }));
+  async function snapshot() {
+    await ready; await backgroundQueue;
+    const image = await imageTransaction('readonly', store => store.get('background'));
+    return { preferences: { ...prefs }, image: image || null };
+  }
+  async function restore(value, commit) {
+    const preferences = normalizePreferences(value.preferences);
+    return enqueueBackground(async () => {
+      const old = { preferences: { ...prefs }, image: await imageTransaction('readonly', store => store.get('background')) };
+      let url = value.image ? await decodedURL(value.image.blob) : null;
+      try {
+        await imageTransaction('readwrite', store => value.image ? store.put(value.image, 'background') : store.delete('background'));
+        commit();
+      } catch (error) {
+        if (url) URL.revokeObjectURL(url);
+        await imageTransaction('readwrite', store => old.image ? store.put(old.image, 'background') : store.delete('background'));
+        throw error;
+      }
+      prefs = preferences; applyPreferences(); applyBackground(url, value.image?.name);
+    });
+  }
+  window.StepAppearance = Object.freeze({ ready, snapshot, restore, normalizePreferences });
 })();

@@ -157,3 +157,12 @@ test('failed installer startup restores ready state with safe retry feedback', a
   assert.equal(service.state().status, 'ready');
   assert.ok(!service.state().message.includes('private-executable-path'));
 });
+
+
+test('official generic metadata fallback handles a rejected primary provider', async () => {
+  const {service,updater}=fixture();let attempts=0,feed;
+  updater.setFeedURL=value=>{feed=value;};
+  updater.checkForUpdates=async()=>{if(++attempts===1)throw Error('403 rate limit');return {updateInfo:release()};};
+  assert.equal((await service.check()).status,'available');
+  assert.equal(attempts,2);assert.equal(feed.url,'https://github.com/zyy051206/next-small-step/releases/latest/download/');
+});

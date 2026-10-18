@@ -85,7 +85,11 @@ function createUpdateService({ currentVersion, updater, notify = () => {}, befor
       installer = null;
       let timeout;
       checking = Promise.race([
-        Promise.resolve().then(() => updater.checkForUpdates()),
+        Promise.resolve().then(() => updater.checkForUpdates()).catch(async error => {
+          if (typeof updater.setFeedURL !== 'function') throw error;
+          updater.setFeedURL({ provider:'generic', url:'https://github.com/zyy051206/next-small-step/releases/latest/download/', useMultipleRangeRequest:false });
+          return updater.checkForUpdates();
+        }),
         new Promise((_, reject) => { timeout = setTimeout(() => {
           updater.netSession?.closeAllConnections().catch(() => {});
           reject(new Error('timeout'));
@@ -98,7 +102,7 @@ function createUpdateService({ currentVersion, updater, notify = () => {}, befor
           return set('available');
         }
         return set('current', { version: info.version });
-      }).catch(() => failure('无法获取更新，请检查网络后重试。'))
+      }).catch(error => failure(/403|429|rate.?limit/i.test(String(error?.message)) ? '更新服务请求过多，请一分钟后重试或切换网络。' : /timeout|timed.?out/i.test(String(error?.message)) ? '连接更新服务超时，请稍后重试或切换网络。' : '更新服务暂时不可用，请稍后重试或检查网络设置。'))
         .finally(() => { clearTimeout(timeout); checking = null; });
       return checking;
     },

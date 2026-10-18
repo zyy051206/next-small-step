@@ -1,0 +1,201 @@
+html[data-theme=dark] {
+  --tone-315b46: #d0e2d9;
+  --tone-ffffff: #262626;
+  --tone-0000000a: #d9d9d90a;
+  --tone-45654f: #d2e0d6;
+  --tone-9eae8e: #bdc8b2;
+  --tone-c7d0b3: #454f31;
+  --tone-fff: #262626;
+  --tone-dbe2da: #333f32;
+  --tone-9c493c: #cdb1ad;
+  --tone-466d54: #aecbb9;
+  --tone-243f3026: #d0e2d826;
+  --tone-264d39: #d0e2d9;
+  --tone-e9efea: #29382c;
+  --tone-f1f5f0: #283624;
+  --tone-a2aaa4: #bac0bb;
+  --tone-cfdbce: #364734;
+  --tone-f5f8f3: #293621;
+  --tone-315b4614: #d0e2d914;
+  --tone-264b39: #d0e2d9;
+  --tone-6f9178: #b4c6b9;
+  --tone-c4955e: #cdbead;
+  --tone-e0f0d6: #334329;
+  --tone-efd2a0: #4f4430;
+  --tone-edf0eb: #2f3729;
+  --tone-fcfdfb: #28311e;
+  --tone-edf2eb: #2b3925;
+  --tone-e0e8dc: #32412b;
+  --tone-e2ebdd: #314228;
+  --tone-e8efe5: #2d3e26;
+  --tone-f0f3ed: #2f3825;
+  --tone-edf0e9: #323a27;
+  --tone-b7c6b7: #384738;
+  --tone-edf3e9: #2d3b24;
+  --tone-7b9778: #b6c5b4;
+  --tone-9aa297: #bbc0b9;
+  --tone-a15c49: #cdb4ad;
+  --tone-f8eee7: #3a2d24;
+  --tone-7f8c9a: #b5bcc5;
+  --tone-eef2f4: #243138;
+  --tone-a16c51: #cdb8ad;
+  --tone-668a5f: #b4c9b0;
+  --tone-eef3eb: #2c3a24;
+  --tone-f5f1e9: #3a3324;
+  --tone-ae8b58: #cdc0ad;
+  --tone-9a8c77: #c6bfb3;
+  --tone-998160: #ccbfae;
+  --tone-91a18b: #bac4b6;
+  --tone-f5f7eb: #353923;
+  --tone-dce2ce: #414a2d;
+  --tone-7b8d74: #bac3b6;
+  --tone-aa8a5d: #cdbfad;
+  --tone-909b8b: #bbc2b8;
+  --tone-f1f4ed: #303923;
+  --tone-a25d4b: #cdb3ad;
+  --tone-93a080: #bec6b3;
+  --tone-e9eee4: #323e27;
+  --tone-283c310b: #d1e0d80b;
+  --tone-fafcf7: #2b331f;
+  --tone-e9efdf: #374027;
+  --tone-f0f3ec: #303924;
+  --tone-8aa66e: #bdcdad;
+  --tone-e0e7d9: #37442b;
+  --tone-a0ab96: #bcc4b5;
+  --tone-89937f: #bdc2b7;
+  --tone-617b4d: #bbccad;
+  --tone-edf1e6: #343d25;
+  --tone-f1f5eb: #313a23;
+  --tone-fcfdf9: #2d321f;
+  --tone-edf3e4: #333d25;
+  --tone-929d87: #bdc3b6;
+  --tone-f5f7f4: #293225;
+  --tone-263b31: #d0e1d9;
+  --tone-6b7970: #b9c1bc;
+  --tone-e1e7e0: #313c2f;
+  --tone-b87d46: #cdbcad;
+  --tone-b78f50: #cdc0ad;
+  --tone-75967f: #b4c6b9;
+  --tone-839087: #b9c0bb;
+  --tone-f4f6f1: #2f3623;
+  --tone-a8b2aa: #b9c1ba;
+  --tone-8baa83: #b5c9b0;
+  --tone-95a092: #bac1b8;
+  --tone-e3eadd: #344229;
+  --tone-55765c: #b2c7b6;
+  --tone-315b4612: #d0e2d912;
+  --tone-315b4617: #d0e2d917;
+  --tone-eef2eb: #2e3925;
+  --tone-dfe7dc: #32412c;
+  --tone-253c3103: #d0e2d903;
+  --tone-e6ece1: #333f28;
+  --tone-62715b: #bac4b6;
+  --tone-edf1e9: #303b25;
+  --tone-4e6656: #b4c6ba;
+  --tone-f8faf5: #2c3520;
+  --tone-c3d1bf: #3a4a35;
+  --tone-263c3106: #d0e1d906;
+  --tone-527a54: #b0cab1;
+  --tone-789772: #b6c7b3;
+  --tone-8b978a: #b9c1b9;
+  --tone-fff0e8: #372922;
+  --tone-a35036: #cdb4ad;
+  --tone-c2ceba: #3e4b35;
+  --tone-74816b: #bcc3b7;
+  --tone-f2f5ee: #2f3923;
+  --tone-546b50: #b6c6b3;
+  --tone-bdcdb6: #3b4c34;
+  --tone-566d4f: #b7c7b2;
+  --tone-e4ecdd: #344228;
+  --tone-8d9b84: #bbc4b6;
+  --tone-eff2ed: #2d3627;
+  --tone-819a76: #b9c7b3;
+  --tone-edf1e8: #323c25;
+  --tone-8ba77c: #b9cab0;
+  --tone-f0f5eb: #2f3a23;
+  --tone-e3ebdc: #354229;
+  --tone-b6c5af: #3c4a36;
+  --tone-749269: #b8c8b2;
+  --tone-94a08d: #bbc3b7;
+  --tone-315b3d: #d0e2d5;
+  --tone-91a08b: #bac3b6;
+  --tone-e4ecdf: #314128;
+  --tone-eef1e9: #333b25;
+  --tone-fff0e7: #382a22;
+  --tone-ab623a: #cdb8ad;
+  --tone-f7f9f4: #2d3521;
+  --tone-e7eddf: #364028;
+  --tone-e7eedf: #354027;
+  --tone-546f45: #b8ccad;
+  --tone-8e9987: #bcc2b7;
+  --tone-edf3e8: #2f3b24;
+  --tone-dae5d2: #38482c;
+  --tone-4e6847: #d5e0d2;
+  --tone-e2eadc: #344329;
+  --tone-687d5b: #bac7b2;
+  --tone-3d6138: #d2e2d0;
+  --tone-344b2e08: #d3e2d008;
+  --tone-789268: #bac8b2;
+  --tone-93ae7b: #bccdad;
+  --tone-d8e3ce: #3b4a2d;
+  --tone-74945d: #baccae;
+  --tone-6e805f: #bcc7b3;
+  --tone-748566: #bcc5b4;
+  --tone-436136: #d5e2d0;
+  --tone-cddbc2: #3e4f30;
+  --tone-e0eacc: #3f482c;
+  --tone-a0ad96: #bcc5b5;
+  --tone-7d8d70: #bcc4b5;
+  --tone-869978: #bbc6b3;
+  --tone-c5d4b6: #404f30;
+  --tone-799665: #bacab0;
+  --tone-eff2eb: #313925;
+  --tone-69805d: #b9c7b2;
+  --tone-899482: #bcc2b8;
+  --tone-b38a5d: #cdbdad;
+  --tone-e7c99f: #4f4230;
+  --tone-fff7e9: #372f22;
+  --tone-8a602c: #cdbead;
+  --tone-23332230: #d2e0d130;
+  --tone-26352c60: #d2dfd760;
+  --tone-74836c: #bbc3b6;
+  --tone-dce5d5: #37462c;
+  --tone-fafbf8: #2d331f;
+  --tone-98a08e: #bdc2b7;
+  --tone-edf3e7: #303c25;
+  --tone-627b51: #bacaaf;
+  --tone-a65438: #cdb5ad;
+  --tone-31513e: #d0e2d7;
+  --tone-253b3120: #d0e2da20;
+  --tone-a45d36: #cdb8ad;
+  --tone-eaf1f2: #24383b;
+  --tone-63818a: #b2c3c8;
+  --tone-ba653d: #cdb7ad;
+  --tone-e5ebe1: #323e2a;
+  --tone-cbd6c6: #3c4a35;
+  --tone-21372917: #d0e2d617;
+}
+:root { --font-scale: 1; }
+#appearance-font { width:100%; accent-color:var(--green); }
+.reminder-settings { border-top:1px solid var(--line); margin-top:22px; padding-top:16px; }
+.reminder-settings label { display:flex; align-items:center; gap:10px; }
+.reminder-settings input[type=checkbox] { width:20px; height:20px; margin:0; }
+.reminder-settings .button { margin:8px 6px 0 0; }
+html[data-theme=dark] { --paper:#141c18; --ink:#edf3ee; --muted:#b4c1b7; --green:#9bc7a8; --line:#415047; --shade-rgb:15 22 18; }
+html[data-theme=dark] body { background:#141c18; color:var(--ink); }
+html[data-theme=dark] :is(.header,.panel,dialog,.planner-panel,.planner-calendar,.planner-agenda,.planner-date-card,.goal-item,.goal-item.selected,.annual-panel,.month-column,.updates-help,#updates-reminder) { background:#202c25; color:var(--ink); border-color:var(--line); }
+html[data-theme=dark] :is(input,textarea,select,.add-step,.close-button,.secondary,.goals,.focus,.goals-empty,.template-row button,.focus-mode,.step-meta span,.planner-day,.planner-event,.planner-filter,.planner-chip,.planner-task,.planner-empty,.appearance-preview) { background:#29382e; color:var(--ink); border-color:var(--line); }
+html[data-theme=dark] :is(.primary,.timer-button,.focus-mode[aria-pressed=true]) { background:#a4d2b1; color:#13271a; }
+html[data-theme=dark] .primary:not(:disabled):hover { background:#bbdfc5; }
+html[data-theme=dark] :is(h1,h2,h3,strong,.goal-select,.step-select,.planner-date-title,.planner-day-number,.timer-display,.focus-task) { color:var(--ink); }
+html[data-theme=dark] :is(small,.optional,.eyebrow,.muted,.step-hint,.privacy,.aside-note,.footer,.goal-select small,.settings-note,.appearance-note,.planner-month-label) { color:var(--muted); }
+html[data-theme=dark] :is(.step-item.active,.header nav a:hover,.header nav a[aria-current=page],.planner-day.is-selected,.planner-day.selected,.planner-day:hover,.planner-filter[aria-pressed=true]) { background:#37503e; color:#f0f7f1; }
+html[data-theme=dark] :is(.progress-track,.mini-track,.timer-ring-bg) { background:#3b4b40; }
+html[data-theme=dark] :is(.form-error,[data-tone=error],.overdue) { color:#ffb9a9; }
+html[data-theme=dark] .has-custom-background :is(.intro,.planner-section-heading,.footprint-heading) { background:#202c25; box-shadow:0 0 0 10px #202c25; }
+html[data-theme=dark] .has-custom-background .header { background:#202c25; }
+html[data-theme=dark] .has-custom-background .footer>span { background:#202c25; }
+html[data-theme=dark] .toast { background:#d8e9dc; color:#172b1e; }
+html[data-theme=dark] dialog::backdrop { background:rgb(0 0 0 / .65); }
+html[data-theme=dark] .appearance-swatches button { border-color:#202c25; }
+@media(max-width:600px) { .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } dialog label { overflow-wrap:anywhere; } }

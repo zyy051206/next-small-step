@@ -31,6 +31,8 @@ import java.util.regex.Pattern;
 /** Native update transport. JavaScript supplies only operation IDs, never URLs or paths. */
 public final class AppUpdater implements AutoCloseable {
     static final String API_URL = "https://api.github.com/repos/zyy051206/next-small-step/releases/latest";
+    static final String FALLBACK_URL = "https://github.com/zyy051206/next-small-step/releases/latest/download/android-update.json";
+    private volatile long retryAfter;
     private static final String DOWNLOAD_ROOT = "https://github.com/zyy051206/next-small-step/releases/download/";
     private static final int MAX_RESPONSE_BYTES = 512 * 1024;
     private static final Pattern VERSION = Pattern.compile("(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})\\.(0|[1-9][0-9]{0,8})");
@@ -137,6 +139,9 @@ public final class AppUpdater implements AutoCloseable {
     }
 
     @JavascriptInterface public void checkUpdates(String id) {
+        if (System.currentTimeMillis() < retryAfter) {
+            report(id,"check","error","更新服务暂时不可用，请在一分钟后重试，或切换网络。");return;
+        }
         if (!begin(id, "check")) return;
         submit(() -> {
             Release cached = restoreReady();
@@ -145,6 +150,7 @@ public final class AppUpdater implements AutoCloseable {
             restored = true;
             try {
                 Release release = fetchRelease();
+                retryAfter = 0;
                 if (stopped()) throw new IOException("Cancelled");
                 if (release.available && cached != null && release.sha256.equals(cached.sha256)
                         && release.version.equals(cached.version) && release.size == cached.size) {
@@ -157,7 +163,8 @@ public final class AppUpdater implements AutoCloseable {
                 report(id, "check", status, message);
             } catch (IOException | JSONException | SecurityException error) {
                 status = cached == null ? (stopped() ? "idle" : "error") : "ready";
-                message = stopped() ? "已取消检查。" : "暂时无法检查更新，请确认网络连接后重试。";
+                if (!stopped()) retryAfter = System.currentTimeMillis() + 60_000;
+                message = stopped() ? "已取消检查。" : checkErrorMessage(error);
                 report(id, "check", stopped() ? "cancelled" : "error", message);
             }
         });
@@ -359,13 +366,51 @@ public final class AppUpdater implements AutoCloseable {
         }
         throw new IOException("Too many redirects");
     }
+    static String checkErrorMessage(Exception error) {
+        if ("Rate limited".equals(error.getMessage())) return "更新接口请求过多，备用服务也暂时不可用。请一分钟后重试或切换网络。";
+        if (error instanceof java.net.SocketTimeoutException) return "连接更新服务超时，请稍后重试或切换网络。";
+        if (error instanceof java.net.UnknownHostException) return "无法找到更新服务器，请检查网络或代理设置。";
+        if (error instanceof javax.net.ssl.SSLException) return "无法建立安全连接，请检查系统时间和网络设置。";
+        if (error instanceof JSONException) return "更新信息格式异常，已停止更新，请稍后重试。";
+        return "主更新服务与备用服务暂时不可用，请一分钟后重试。";
+    }
     private Release fetchRelease() throws IOException, JSONException {
+        Exception primary;
+        try { return fetchApiRelease(); } catch(IOException | JSONException error) { primary=error; }
+        if(stopped()) throw new IOException("Cancelled");
+        // Fixed official release asset; no personal access token is shipped in the app.
+        HttpURLConnection fallback=null;
+        try {
+            URL url=new URL(FALLBACK_URL); long deadline=SystemClock.elapsedRealtime()+18_000;
+            for(int i=0;i<5;i++) {
+                if(stopped()||SystemClock.elapsedRealtime()>deadline||!UpdateFiles.allowedDownloadUrl(url))throw new IOException("Fallback unavailable");
+                fallback=configure(url);fallback.setConnectTimeout(4_000);fallback.setReadTimeout(5_000);
+                int code=fallback.getResponseCode();
+                if(code==200) {
+                    if(fallback.getContentLengthLong()>MAX_RESPONSE_BYTES)throw new IOException("Metadata too large");
+                    try(InputStream input=fallback.getInputStream()){return parseRelease(new JSONObject(readBounded(input,MAX_RESPONSE_BYTES)),BuildConfig.VERSION_NAME);}
+                }
+                String location=fallback.getHeaderField("Location");fallback.disconnect();fallback=null;
+                if((code!=301&&code!=302&&code!=303&&code!=307&&code!=308)||location==null)throw new IOException("Fallback unavailable");
+                url=new URL(url,location);
+            }
+            throw new IOException("Too many redirects");
+        } catch(IOException | JSONException failure) {
+            if(primary instanceof JSONException)throw (JSONException)primary;
+            throw (IOException)primary;
+        } finally {if(fallback!=null)fallback.disconnect();connection=null;}
+    }
+
+    private Release fetchApiRelease() throws IOException, JSONException {
         HttpURLConnection request = configure(new URL(API_URL));
         try {
             if (stopped()) throw new IOException("Cancelled");
+            request.setConnectTimeout(6_000); request.setReadTimeout(8_000);
             request.setRequestProperty("Accept", "application/vnd.github+json");
             request.setRequestProperty("X-GitHub-Api-Version", "2022-11-28");
-            if (request.getResponseCode() != HttpURLConnection.HTTP_OK || request.getContentLengthLong() > MAX_RESPONSE_BYTES) throw new IOException("Release unavailable");
+            int code = request.getResponseCode();
+            if (code == 403 || code == 429) throw new IOException("Rate limited");
+            if (code != HttpURLConnection.HTTP_OK || request.getContentLengthLong() > MAX_RESPONSE_BYTES) throw new IOException("Release unavailable");
             try (InputStream input = request.getInputStream()) {
                 return parseRelease(new JSONObject(readBounded(input, MAX_RESPONSE_BYTES)), BuildConfig.VERSION_NAME);
             }

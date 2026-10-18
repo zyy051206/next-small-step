@@ -34,6 +34,7 @@
   let automatic = true;
   try { automatic = JSON.parse(localStorage.getItem(preferenceKey))?.automatic !== false; } catch { /* Optional preference storage. */ }
   $('updates-auto').checked = automatic;
+  let retryAfter = 0;
   let sequence = 0, epoch = 0, lastCheck = 0, checked = false, phase = 'idle';
   let offer = null, dismissedVersion = '', received = 0, total = 0;
   const requests = new Map();
@@ -80,6 +81,7 @@
   function send(action) {
     if (hasAction(action)) return;
     if (action === 'check' && busy()) return;
+    if (action === 'check' && Date.now() < retryAfter) { message(`请在 ${Math.ceil((retryAfter-Date.now())/1000)} 秒后重试，避免频繁请求。`,true); return; }
     if (action === 'download' && (!offer || !['available', 'cancelled'].includes(phase))) return;
     if (action === 'install' && phase !== 'ready') return;
     if (action === 'cancel' && phase !== 'progress') return;
@@ -92,7 +94,7 @@
       if (action === 'state') return;
       phase = action === 'cancel' ? 'progress' : 'error';
       message('连接超时，请稍后再试。', true); render();
-    }, action === 'state' ? 10000 : 35000);
+    }, action === 'state' ? 10000 : 55000);
     requests.set(requestId, request);
     if (action === 'check') { lastCheck = Date.now(); checked = true; phase = 'checking'; offer = null; reminder.hidden = true; message('正在检查新版本…'); }
     if (action === 'download') { phase = 'progress'; received = 0; total = offer.size; message('正在应用内下载更新，可随时取消。'); }
@@ -111,6 +113,7 @@
     if (action === 'state' && ['checking', 'cancelling'].includes(phase)) return;
     if (action === 'download' && phase === 'cancelling' && result.status === 'progress') return;
     if (result.status === 'error') {
+      if(action==='check') retryAfter=Date.now()+60000;
       clearAction('download'); clearAction('install');
       phase = (action === 'download' && offer) ? 'available' : 'error';
       message(typeof result.message === 'string' ? result.message.slice(0, 240) : '更新失败，请检查网络后重试。', true);
@@ -162,6 +165,7 @@
     catch { message('当前存储不可用，此设置只在本次使用中生效。', true); }
     if (automatic && !checked && phase === 'idle') send('check');
   });
+  addEventListener('nextstep-settings-restored', () => { try { automatic=JSON.parse(localStorage.getItem(preferenceKey))?.automatic!==false; } catch { automatic=true; } $('updates-auto').checked=automatic; });
   function autoCheck() {
     if (automatic && !document.hidden && !busy() && phase !== 'ready' && !hasAction('state') && Date.now() - lastCheck > 6 * 60 * 60 * 1000) send('check');
   }

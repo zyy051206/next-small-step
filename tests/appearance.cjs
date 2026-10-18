@@ -26,7 +26,7 @@ const server = createServer((req, res) => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/`;
   const browser = spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19361',
+    '--headless=new', '--disable-extensions', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19361',
     '--user-data-dir=' + path.join(qa, 'appearance-browser-' + Date.now()), 'about:blank'
   ], { windowsHide: true, stdio: 'ignore' });
   let ws, count = 0;
@@ -37,7 +37,7 @@ const server = createServer((req, res) => {
       catch { await delay(250); }
     }
     if (!tabs) throw Error('Headless Edge unavailable');
-    ws = new WebSocket(tabs.find(tab => tab.type === 'page').webSocketDebuggerUrl);
+    ws = new WebSocket(tabs.find(tab => tab.type === 'page' && tab.url === 'about:blank').webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
     let id = 0;
     const pending = new Map(), errors = [];
@@ -204,6 +204,40 @@ const server = createServer((req, res) => {
     await close(); await reload();
     assert(await color() === '#315b46', 'recovered settings remain valid after refresh');
     assert(isDeepStrictEqual(await ev('StepApp.getState()'), JSON.parse(business)) && await ev(`localStorage.getItem(StepCore.key)===${JSON.stringify(businessStorage)}`), 'appearance changes preserve all task and focus data exactly');
+
+    // Display modes, scaled mobile layouts, complete backup round-trip and rollback.
+    await open(); await upload(pngPath); await waitFor(background);
+    await ev("document.querySelector('#appearance-theme').value='dark';document.querySelector('#appearance-theme').dispatchEvent(new Event('change'));document.querySelector('#appearance-font').value='130';document.querySelector('#appearance-font').dispatchEvent(new Event('input'));document.querySelector('#appearance-shade').value='100';document.querySelector('#appearance-shade').dispatchEvent(new Event('input'))");
+    assert(await ev("document.documentElement.dataset.theme==='dark' && getComputedStyle(document.body).fontSize==='18.2px'"), 'dark theme and 130 percent text are applied');
+    await close(); await reload();
+    assert(await ev("document.documentElement.dataset.theme==='dark' && document.querySelector('#appearance-font').value==='130' && document.querySelector('#appearance-shade').value==='100'"), 'theme, font and full overlay survive reload');
+    for(const width of [1440,390,320]) {
+      await viewport(width);
+      for(const route of ['workspace','planner','important-dates','footprints']) {
+        await ev(`location.hash=${JSON.stringify(route)}`);await delay(100);
+        assert(await ev('document.documentElement.scrollWidth<=innerWidth+1'), `dark large-text ${route} fits ${width}px`);
+      }
+      await screenshot(`display-dark-${width}.png`);
+    }
+    await open(); await screenshot('display-settings-dark.png'); await close();
+    await ev("(async()=>{localStorage.setItem('next-small-step.reminders.v1',JSON.stringify({enabled:true,sound:false}));localStorage.setItem('next-small-step.updates.v1',JSON.stringify({automatic:false}));window.fullBackup=await StepBackup.create(StepApp.getState());window.preRestore=await StepBackup.parse(fullBackup)})()");
+    assert(await ev("fullBackup.format==='next-small-step.full-backup' && fullBackup.appearance.image.data.startsWith('data:image/png;base64,') && fullBackup.appearance.preferences.theme==='dark' && fullBackup.reminders.sound===false"), 'full backup includes business, image and settings');
+    await open();await click('#appearance-bg-remove');await waitFor('!('+background+')');await close();
+    await ev('StepBackup.restore(preRestore)');
+    assert(await ev(background), 'complete backup restores the actual wallpaper');
+    assert(await ev("localStorage.getItem(StepCore.key)===JSON.stringify(fullBackup.data) && JSON.parse(localStorage.getItem('next-small-step.updates.v1')).automatic===false"), 'complete backup restores progress and update settings');
+    assert(await ev("StepBackup.parse(fullBackup.data).then(value=>value.legacy===true)"), 'old progress-only backups remain supported');
+    assert(await ev("(async()=>{const bad=structuredClone(fullBackup);bad.appearance.image.data='data:image/png;base64,AAAA';try{await StepBackup.parse(bad);return false;}catch{return true;}})()"), 'corrupt image is rejected before mutation');
+    assert(await ev("(async()=>{const bad=structuredClone(fullBackup);bad.appearance.preferences.fontScale=900;try{await StepBackup.parse(bad);return false;}catch{return true;}})()"), 'out-of-range appearance settings are rejected');
+    assert(await ev("(async()=>{const before=localStorage.getItem(StepCore.key);const bundle=await StepBackup.parse(fullBackup);bundle.data.minutes=45;const original=Storage.prototype.setItem;let failed=false;Storage.prototype.setItem=function(k,v){if(k==='next-small-step.appearance.v1'&&!failed){failed=true;throw Error('simulated quota');}return original.call(this,k,v)};let rejected=false;try{await StepBackup.restore(bundle)}catch{rejected=true}finally{Storage.prototype.setItem=original}return rejected&&localStorage.getItem(StepCore.key)===before&&(await StepAppearance.snapshot()).image?.name===fullBackup.appearance.image.name})()"), 'failed restore rolls back progress and wallpaper');
+    await ev("window.reminderCalls=[];window.NextStepReminders={schedule:value=>reminderCalls.push(JSON.parse(value)),getStatus:()=>JSON.stringify({permission:'granted',exact:true,platform:'android'}),requestPermission:()=>{},requestExactPermission:()=>{}};");
+    // Native mock must be captured by the module as it initializes.
+    await ev("new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='reminders.js';s.onload=resolve;s.onerror=reject;document.querySelector('.reminder-settings').remove();document.body.append(s)})");
+    await ev("document.querySelector('#reminder-enabled').checked=true;document.querySelector('#reminder-enabled').dispatchEvent(new Event('change'));StepReminders.sync({status:'running',endsAt:Date.now()+60000,kind:'focus'})");
+    assert(await ev("reminderCalls.at(-1).title==='专注结束了'"), 'running focus schedules a native reminder');
+    await ev("StepReminders.sync({status:'paused',endsAt:Date.now()+60000,kind:'focus'})");
+    assert(await ev('reminderCalls.at(-1)===null'), 'pausing cancels the pending native reminder');
+
     const localUrl = pathToFileURL(path.join(root, 'dist', 'index.html')).href;
     await cdp('Page.navigate', { url: localUrl }); await delay(150); await waitFor(ready); await ev('StepAppearance.ready');
     await open(); await upload(pngPath); await waitFor(background, 'local file background upload');

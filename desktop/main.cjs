@@ -33,6 +33,16 @@ const pageErrors = [];
 let updates;
 let smokeUpdater;
 
+const reminders = require('./reminders.cjs').createReminders(() => { if(window && !window.isDestroyed()){window.show();window.focus();} });
+ipcMain.handle('nextstep-reminder', (event,action,payload) => {
+  if(!window || window.isDestroyed() || event.sender!==window.webContents || event.senderFrame!==event.sender.mainFrame || !localUrl(event.senderFrame.url,true))throw Error('Reminder request denied');
+  if(action==='status'||action==='permission')return reminders.getStatus();
+  if(action==='schedule' && typeof payload==='string' && payload.length<=1024){reminders.schedule(payload);return true;}
+  throw Error('Invalid reminder action');
+});
+app.on('before-quit',()=>reminders.cancel());
+
+
 for (const action of ['check', 'download', 'install', 'cancel', 'state']) {
   ipcMain.handle(`nextstep-update-${action}`, async (event, requestId) => {
     if (!window || window.isDestroyed() || event.sender !== window.webContents
@@ -196,7 +206,7 @@ async function runSmoke() {
     await evaluate("window.backupStatus=null;window.addEventListener('nextstep-backup-result',event=>{window.backupStatus=event.detail.status});document.querySelector('#export-data').click()");
     await waitFor("window.backupStatus==='success'", 'real Blob backup completion');
     const exported = JSON.parse(fs.readFileSync(path.join(smokeRoot, 'exported-backup.json'), 'utf8'));
-    if (exported.goals[0]?.title !== '桌面启动验证') throw new Error('Exported backup does not contain real progress');
+    if (exported.data?.goals[0]?.title !== '桌面启动验证') throw new Error('Exported backup does not contain real progress');
     checks.push('Blob export writes a real JSON backup before reporting success');
     smokeDownloadMode = 'cancel';
     await evaluate("window.backupStatus=null;document.querySelector('#export-data').click()");

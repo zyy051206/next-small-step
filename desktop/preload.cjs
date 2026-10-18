@@ -30,3 +30,5 @@ contextBridge.exposeInMainWorld('NextStepUpdates', Object.freeze({
   cancelUpdate: requestId => requestUpdate('cancel', requestId),
   getUpdateState: requestId => requestUpdate('state', requestId)
 }));
+
+contextBridge.exposeInMainWorld('NextStepReminders', Object.freeze({ getStatus:()=>ipcRenderer.invoke('nextstep-reminder','status'), requestPermission:()=>ipcRenderer.invoke('nextstep-reminder','permission'), requestExactPermission:()=>{}, schedule:value=>ipcRenderer.invoke('nextstep-reminder','schedule',value) }));

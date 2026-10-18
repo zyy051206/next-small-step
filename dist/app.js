@@ -83,6 +83,7 @@
     }
   }
   function drawTimer() {
+    window.StepReminders?.sync(state.timer);
     const t = state.timer, step = getStep(), mode = t?.kind || state.mode, isFocus = mode === 'focus', ms = t ? C.remaining(t) : (isFocus ? state.minutes : state.preferences[mode]) * 60000, seconds = Math.ceil(ms / 1000);
     $('timer-readout').textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     $('focus-state').textContent = t ? t.status === 'running' ? (isFocus ? '正在专注' : '正在休息') : '已暂停' : (isFocus ? '准备开始' : mode === 'shortBreak' ? '短休息 · 等待开始' : '长休息 · 等待开始');
@@ -228,18 +229,26 @@
     const status = event.detail?.status;
     toast(status === 'success' ? '备份已保存，可以用它迁移到其他设备。' : status === 'cancelled' ? '已取消保存，当前数据没有改变。' : '备份未能保存，请检查保存位置后重试。');
   });
-  $('export-data').onclick = () => {
+  $('export-data').onclick = async () => {
     tick();
     if (storageBlocked) { try { const raw = localStorage.getItem(C.key); if (raw) { download(raw, `下一小步-原始数据-${C.dayKey(Date.now())}.json`); return; } } catch {} }
-    download(JSON.stringify(state, null, 2), `下一小步-备份-${C.dayKey(Date.now())}.json`);
+    try { $('export-data').disabled = true; const bundle = await StepBackup.create(state); download(JSON.stringify(bundle), `下一小步-完整备份-${C.dayKey(Date.now())}.json`); }
+    catch { toast('完整备份未能生成，请检查存储和背景图片后重试。'); }
+    finally { $('export-data').disabled = false; }
   };
   $('import-data').onclick = () => { if (state.timer) { toast('请先完成或重置当前计时，再导入备份。'); return; } $('import-file').click(); };
   $('import-file').onchange = async e => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
     try {
-      if (file.size > 20000000) throw new Error('备份文件超过 20 MB，请选择较小的备份文件。');
-      const imported = C.validate(JSON.parse(await file.text()));
-      confirmAction('用备份恢复进度？', `备份包含 ${imported.goals.length} 个目标、${imported.dates.length} 个重要日和 ${imported.sessions.length} 条专注记录。导入会替换当前数据，建议先取消并导出当前备份。`, () => { state = imported; storageBlocked = false; $('storage-warning').hidden = true; save(); tick(); render(); toast('备份已恢复。'); });
+      if (file.size > 64 * 1024 * 1024) throw new Error('备份文件超过 64 MB。');
+      const bundle = await StepBackup.parse(JSON.parse(await file.text())), imported = bundle.data;
+      confirmAction('用备份恢复数据？', `备份包含 ${imported.goals.length} 个目标、${imported.dates.length} 个重要日和 ${imported.sessions.length} 条专注记录。${bundle.legacy ? '这是旧版进度备份，保留当前外观设置。' : '同时恢复背景、外观、更新与提醒设置。'}导入会替换当前数据，建议先导出当前完整备份。`, async () => {
+        if (state.timer) { toast('请先结束当前计时，再恢复备份。'); return; }
+        const blocker = document.createElement('dialog'); blocker.textContent = '正在恢复，请稍候…'; document.body.append(blocker); blocker.addEventListener('cancel', e=>e.preventDefault()); blocker.showModal();
+        try { await StepBackup.restore(bundle); state = imported; storageBlocked = false; $('storage-warning').hidden = true; tick(); render(); toast('备份已恢复，通知权限仍由这台设备决定。'); }
+        catch (error) { toast(error.message || '恢复失败，请重试。'); }
+        finally { blocker.close(); blocker.remove(); }
+      });
     } catch (error) { toast(error instanceof SyntaxError ? '这不是有效的 JSON 备份，原数据未改变。' : error.message); }
   };
   // A second tab must load the latest state rather than silently overwrite it.
@@ -250,7 +259,7 @@
     const privacy = document.querySelector('.privacy');
     if (privacy) { const dot = document.createElement('i'); privacy.replaceChildren(dot, document.createTextNode('只存在这台设备里')); }
     const dataHelp = document.querySelector('.guide-list li:last-child p');
-    if (dataHelp) dataHelp.textContent = '应用数据保存在本机，不同设备和网页之间不会自动同步。使用导出、导入备份迁移记录；清除应用数据前请先备份。离开应用后仍按时钟计算，回来时补记已结束的单段计时；不会自动循环或在后台发出到时通知。';
+    if (dataHelp) dataHelp.textContent = '应用数据保存在本机，不同设备和网页之间不会自动同步。使用导出、导入备份迁移记录；清除应用数据前请先备份。离开应用后仍按时钟计算，回来时补记已结束的单段计时；不会自动循环。可在番茄钟设置中开启系统提醒，通知权限由当前设备控制。';
   }
   window.StepApp = { getState: () => state, saveAndRender: () => { save(); render(); }, confirm: confirmAction, toast, completeStep, selectTask, editTask, addTask };
   window.StepPlanner?.init(window.StepApp);

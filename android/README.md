@@ -1,6 +1,6 @@
 # 下一小步 · Android
 
-这是将仓库 `dist/` 原样打包进 APK 的轻量 Android 应用。最低 Android 8.0（API 26），包名 `io.github.zyy051206.nextstep`。任务、计时和本机数据可离线使用；原生更新检查与下载需要网络权限。2.0.3 使用安装来源权限调起 Android 系统安装确认，不申请广泛存储、通知或后台服务权限。
+这是将仓库 `dist/` 原样打包进 APK 的轻量 Android 应用。最低 Android 8.0（API 26），包名 `io.github.zyy051206.nextstep`。任务、计时和本机数据可离线使用；原生更新检查与下载需要网络权限。2.0.3 使用安装来源权限调起 Android 系统安装确认，不申请广泛存储或后台服务权限。2.1.0 增加系统通知与准时提醒权限，仅在用户主动选择时申请。
 
 ## 安装与数据
 
@@ -14,7 +14,7 @@
 
 2.0.2 的更新按钮会打开浏览器；先安装一次 2.0.3，后续即可使用应用内流程。所有更新操作都不会上传目标、专注记录或背景图片。无法联网时仍可使用原有功能，稍后重试更新即可。清理应用缓存会删除下载的更新文件，不影响独立保存的进度。
 
-应用关闭或进入后台后，不保证持续运行，也没有后台通知。正在运行的计时依据已保存的结束时间，在回到应用时校准并补记；暂停的计时保持暂停。
+应用关闭或进入后台后，不保证持续运行，2.1.0 可以通过系统 AlarmManager 在后台提醒当前这一段计时结束；需要在番茄钟设置中开启并允许通知，未允许准时提醒时可能延迟。强行停止应用、勿扰或厂商省电设置可能阻止提醒。正在运行的计时依据已保存的结束时间，在回到应用时校准并补记；暂停的计时保持暂停。
 
 正式安装包使用所有者持有的固定私有签名；后续版本保持相同包名和签名，并提高 `versionCode`，即可覆盖升级保留进度。签名密钥保存在仓库之外，不上传源码或构建附件。更新前仍建议导出备份。开发调试包和正式包签名不同，不能互相覆盖；需要先备份，再卸载调试包后安装正式包并恢复备份。卸载/清除应用数据会删除本地进度。
 
@@ -44,6 +44,6 @@ APK 输出：`android/app/build/outputs/apk/debug/app-debug.apk` 与 `android/ap
 
 更新桥 `NextStepUpdates` 提供 `getVersion()`、`getPlatform()`、`checkUpdates(requestId)`、`downloadUpdate(requestId)`、`installUpdate(requestId)`、`cancelUpdate(requestId)` 与 `getUpdateState(requestId)`。结果通过 `nextstep-update-result` 事件派发，包含 `requestId`、`action`、`status`、`currentVersion`，有更新时包含 `version`、`notes`、`size`、`received`、`total`、`percent`。状态包括 `available`、`current`、`error`、`progress`、`ready`、`installing`、`cancelled`、`permission` 和 `idle`。下载进度沿用下载请求 ID，`ready` 代表校验完成；`installing` 表示已打开系统确认，不代表系统已安装成功。状态查询异步恢复缓存，避免主线程读取 APK。
 
-元数据仅来自固定仓库的 HTTPS API，禁止 API 重定向。下载起始地址精确匹配该仓库、标签与 APK 文件名；重定向仅允许明确列出的 GitHub HTTPS 下载主机，限制跳转次数、等待时间及 512 MiB 文件上限。要求发布资产提供 SHA-256，并核对流的实际字节数、SHA-256、APK 包名、递增的 versionCode、versionName 和当前应用签名。每次安装以及恢复缓存都重新验证；校验失败不能启动安装。FileProvider 只暴露 `cache/updates/install/`，不暴露业务数据、背景图或更新元数据，安装 Intent 仅授予临时读取权限。网页不能指定网络地址或文件路径。
+元数据优先来自固定仓库的 HTTPS API；失败时尝试该仓库最新正式发布的 android-update.json。API 禁止重定向，备用资源仅允许已列出的 HTTPS 下载域名。下载起始地址精确匹配该仓库、标签与 APK 文件名；重定向仅允许明确列出的 GitHub HTTPS 下载主机，限制跳转次数、等待时间及 512 MiB 文件上限。要求发布资产提供 SHA-256，并核对流的实际字节数、SHA-256、APK 包名、递增的 versionCode、versionName 和当前应用签名。每次安装以及恢复缓存都重新验证；校验失败不能启动安装。FileProvider 只暴露 `cache/updates/install/`，不暴露业务数据、背景图或更新元数据，安装 Intent 仅授予临时读取权限。网页不能指定网络地址或文件路径。
 
 相关接口依据：[Android 网络连接](https://developer.android.com/reference/java/net/HttpURLConnection)、[FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)、[应用安装来源权限](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls())、[签名信息](https://developer.android.com/reference/android/content/pm/SigningInfo)、[GitHub 最新发布接口](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。
