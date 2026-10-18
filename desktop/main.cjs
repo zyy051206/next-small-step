@@ -101,6 +101,9 @@ async function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true,
       sandbox: true, nodeIntegration: false, webSecurity: true, webviewTag: false, spellcheck: false }
   });
+  // Loading the document can finish before Chromium has produced its first
+  // frame. Wait for that frame before a hidden smoke test captures the window.
+  const painted = new Promise(resolve => window.once('ready-to-show', resolve));
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', details => { if (!localUrl(details.url, true)) details.preventDefault(); });
   window.webContents.on('will-frame-navigate', details => { if (!details.isMainFrame || !localUrl(details.url, true)) details.preventDefault(); });
@@ -116,6 +119,7 @@ async function createWindow() {
       { label: '放大', role: 'zoomIn' }, { label: '缩小', role: 'zoomOut' }, { label: '实际大小', role: 'resetZoom' }, { label: '全屏', role: 'togglefullscreen' }] }
   ]));
   await window.loadURL(START_URL);
+  await painted;
   if (!smoke) window.show();
   return window;
 }
@@ -168,7 +172,7 @@ async function runSmoke() {
   }
   if (pageErrors.length) throw new Error(`Renderer error: ${pageErrors.join('; ')}`);
   session.defaultSession.flushStorageData();
-  const screenshot = await window.webContents.capturePage();
+  const screenshot = await window.webContents.capturePage(undefined, { stayHidden: true });
   fs.writeFileSync(path.join(smokeRoot, `${smokePhase}.png`), screenshot.toPNG());
   fs.writeFileSync(path.join(smokeRoot, `${smokePhase}.json`), JSON.stringify({ success: true, version: app.getVersion(), phase: smokePhase, checks }, null, 2));
   app.quit();
