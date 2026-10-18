@@ -1,0 +1,8 @@
+node_modules/
+release/
+artifacts/
+.qa/
+.tools/
+icon.ico
+icon.png
+npm-debug.log*

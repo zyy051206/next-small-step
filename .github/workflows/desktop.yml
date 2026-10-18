@@ -1,0 +1,64 @@
+name: Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['desktop/**', 'dist/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['desktop/**', 'dist/**', '.github/workflows/desktop.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-exe:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: desktop
+        shell: pwsh
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install the locked desktop dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build the offline portable EXE
+        run: npm run build:win
+      - name: Smoke test the actual EXE across two launches
+        run: npm run smoke
+      - name: Prepare download and checksum
+        run: |
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          Copy-Item -LiteralPath release/next-small-step-2.0.0-windows-x64.exe -Destination artifacts/
+          $artifact = Get-Item -LiteralPath artifacts/next-small-step-2.0.0-windows-x64.exe
+          $checksum = (Get-FileHash -LiteralPath $artifact.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$checksum  $($artifact.Name)" | Set-Content -LiteralPath artifacts/SHA256SUMS.txt -Encoding utf8
+          @{ version = '2.0.0'; commit = $env:GITHUB_SHA; platform = 'windows'; arch = 'x64'; file = $artifact.Name; sha256 = $checksum } | ConvertTo-Json | Set-Content -LiteralPath artifacts/build-info.json -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-small-step-windows
+          path: desktop/artifacts/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Windows verification screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-verification
+          path: desktop/.qa/
+          include-hidden-files: true
+          retention-days: 14

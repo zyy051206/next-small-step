@@ -2,57 +2,67 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f4ed">
+  <meta name="theme-color" content="#f5f7f4">
   <meta name="description" content="下一小步：把模糊的目标拆成可以开始的小行动，用一段专注，让事情往前一点。">
   <title>下一小步 · 让想法慢慢发生</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="stats.css">
-  <script src="core.js" defer></script><script src="stats.js" defer></script><script src="app.js" defer></script>
+  <link rel="stylesheet" href="planner.css">
+  <script src="core.js" defer></script><script src="stats.js" defer></script><script src="planner.js" defer></script><script src="app.js" defer></script><script src="ui.js" defer></script>
 </head>
 <body>
 <header class="header wrap">
-  <a class="brand" href="#workspace" aria-label="下一小步首页"><img src="icon.svg" alt="" width="34" height="34"><span>下一小步<small>SMALL STEPS, REAL CHANGE.</small></span></a>
-  <nav aria-label="主导航"><a href="#workspace" class="nav-main">工作台</a><a href="#footprints">我的足迹</a><button id="guide-open" class="text-button">使用指南 ↗</button></nav>
-  <span class="privacy"><i></i>只存在你的浏览器里</span>
+  <a class="brand" href="#workspace" aria-label="下一小步首页"><img src="icon.svg" alt="" width="36" height="36"><span>下一小步<small>A LITTLE, EVERY DAY.</small></span></a>
+  <p class="nav-caption">属于你的时间与生活</p>
+  <nav aria-label="主导航">
+    <a href="#workspace" class="nav-main is-current"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg><span>我的工作台</span></a>
+    <a href="#planner"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16m-11 4h2m2 0h2m-6 3h2"/></svg><span>日历计划</span></a>
+    <a href="#important-dates"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></svg><span>重要日子</span></a>
+    <a href="#footprints"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10m7 10V4m7 16v-7M3 21h18"/></svg><span>专注足迹</span></a>
+  </nav>
+  <div class="sidebar-bottom"><button id="guide-open" class="text-button"><span aria-hidden="true">?</span> 使用指南</button><span class="privacy"><i></i>只存在你的浏览器里</span><p>慢慢来，也在向前。</p></div>
 </header>
 <main class="wrap">
   <section class="intro" id="workspace">
-    <div><div class="eyebrow" id="today-label"></div><h1>不用一下走很远。<br>今天，<em>往前一小步。</em></h1><p>把脑海里的「总有一天」，变成手边的一件小事。</p></div>
-    <div class="intro-note"><span class="note-spark">✳</span><p>先开始，再慢慢变好。</p><span>一个目标 · 一个行动 · 一段专注</span></div>
+    <div><div class="eyebrow" id="today-label"></div><h1>今天，专注于<em>重要的事。</em></h1><p>安排眼前的小步，也为未来的日子留一点期待。</p></div>
+    <button id="quick-task-open" class="button primary"><span aria-hidden="true">＋</span> 新建待办</button>
   </section>
   <div id="storage-warning" class="warning" role="alert" hidden></div>
   <section class="workspace" aria-label="目标与专注工作台">
     <aside class="goals panel">
-      <div class="section-label"><span>01 / 想做的事</span><span id="goal-count">0 个目标</span></div>
-      <h2>给想法一个位置。</h2>
+      <div class="section-label"><span>我的目标</span><span id="goal-count" class="count-badge">0 个目标</span></div>
+      <h2>让想法有个去处</h2>
       <div id="goal-list" class="goal-list"></div>
       <button class="add-goal" id="new-goal"><span>＋</span> 写下一个目标</button>
-      <div class="aside-note"><span>小提示</span><p>目标可以很大，下一步要足够小。<br>小到你现在就愿意开始。</p></div>
+      <div class="aside-note"><span>ONE STEP AT A TIME</span><p>目标可以很大。<br>下一步，足够小就好。</p></div>
     </aside>
     <section class="steps panel" aria-labelledby="steps-heading">
-      <div class="section-label"><span>02 / 下一小步</span><button id="edit-goal" class="text-button" hidden>编辑目标 ↗</button></div>
-      <div id="steps-empty" class="empty-center"><svg viewBox="0 0 150 110" aria-hidden="true"><path d="M25 83h100M44 82V50h25v32M78 82V29h28v53" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M42 35l39-20m-12-1 12 1-5 11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="117" cy="20" r="4" fill="#d6a66c"/></svg><h2 id="steps-heading">从一件小事开始</h2><p>在左边写下一个目标，<br>把它拆成几个看得见终点的行动。</p><button class="button primary" id="empty-create">创建我的第一个目标 <span>↗</span></button></div>
+      <div class="section-label"><span>下一小步</span><button id="edit-goal" class="text-button" hidden>编辑目标 ↗</button></div>
+      <div id="steps-empty" class="empty-center"><svg viewBox="0 0 150 110" aria-hidden="true"><path d="M25 83h100M44 82V50h25v32M78 82V29h28v53" fill="none" stroke="currentColor" stroke-width="2"/><path d="M42 35l39-20m-12-1 12 1-5 11" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="117" cy="20" r="4" fill="#d6a66c"/></svg><h2 id="steps-heading">每个开始，都很值得</h2><p>先写下一个目标，<br>再把它拆成今天可以完成的小事。</p><button class="button primary" id="empty-create">创建第一个目标 <span>↗</span></button></div>
       <div id="steps-content" hidden><h2 id="goal-title"></h2><p id="goal-why" class="muted"></p><div class="progress-meta"><span id="progress-text"></span><span id="progress-percent"></span></div><div class="progress-track"><div id="progress-fill"></div></div><div id="step-list" class="step-list"></div><form id="add-step-form" class="add-step"><label class="sr-only" for="step-input">添加下一步</label><input id="step-input" maxlength="160" required placeholder="再加一个可以开始的小行动…"><button type="submit" aria-label="添加行动">＋</button></form><p class="step-hint">勾选标记完成 · 点行动文字选择专注任务</p></div>
     </section>
     <section class="focus panel" aria-labelledby="focus-heading">
-      <div class="section-label"><span>03 / 留一点时间</span><span class="focus-dot" id="focus-state">准备开始</span></div>
-      <h2 id="focus-heading">这一刻，只做一件事。</h2>
+      <div class="section-label"><span id="focus-heading">留一段专注时间</span><button id="focus-settings-open" class="icon-button" aria-label="设置番茄钟时长"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg></button></div>
+      <div id="focus-modes" class="focus-modes"></div>
+      <span class="focus-dot" id="focus-state">准备开始</span>
       <div class="timer-art"><svg class="timer-ring" viewBox="0 0 240 240" aria-hidden="true"><circle class="ring-base" cx="120" cy="120" r="108"/><circle id="ring-progress" cx="120" cy="120" r="108"/></svg><svg class="plant" viewBox="0 0 100 90" aria-hidden="true"><path d="M50 82V37" stroke="#45654f" stroke-width="2" fill="none"/><path d="M50 61C22 61 23 35 26 32c22 0 27 16 24 29Z" fill="#9eae8e"/><path d="M50 48c-2-26 12-34 26-33 2 21-8 34-26 33Z" fill="#45654f"/><path d="M50 78c-9-11-18-12-28-11 1 12 13 17 28 11Z" fill="#c7d0b3"/><path d="M29 83h43" stroke="#b4bfa5" stroke-width="1"/></svg><div class="timer-readout" id="timer-readout" role="timer" aria-label="专注剩余时间">25:00</div></div>
       <p class="focus-task" id="focus-task">选好下一步，再把时间留给它。</p>
       <div class="durations" role="group" aria-label="专注时长"><button data-minutes="10" aria-pressed="false">10 分钟</button><button data-minutes="25" aria-pressed="true">25 分钟</button><button data-minutes="45" aria-pressed="false">45 分钟</button></div>
       <button id="timer-start" class="button primary timer-start" disabled>开始专注 <span>→</span></button><div class="timer-actions"><button id="timer-reset" class="text-button" disabled>重置计时</button><span>·</span><button id="finish-step" class="text-button" disabled>完成这一步 ✓</button></div>
-      <p class="focus-footnote">不必追赶什么，按自己的节奏来。</p>
+      <p id="pomodoro-progress" class="focus-footnote">一段专注，一点进展。</p>
     </section>
   </section>
+  <section id="planner" class="planner-section" aria-label="日历与每日计划"></section>
+  <section id="important-dates" class="dates-section" aria-label="重要日期"></section>
   <section class="footprints" id="footprints" aria-labelledby="footprint-title">
-    <div class="footprint-heading"><div class="eyebrow">LITTLE BY LITTLE</div><h2 id="footprint-title">每一步，都算数。</h2><p>这里留下你的真实行动。<br>没有连续打卡，也没有落后的日子。</p><div class="data-actions"><button class="text-button" id="export-data">导出备份 ↗</button><button class="text-button" id="import-data">导入备份 ↙</button><input id="import-file" type="file" accept="application/json,.json" hidden></div></div>
+    <div class="footprint-heading"><div><div class="eyebrow">YOUR PROGRESS</div><h2 id="footprint-title">看见一点一滴的积累</h2><p>每一段认真投入的时间，都在这里。</p></div><div class="data-actions"><button class="text-button" id="export-data">导出备份 ↗</button><button class="text-button" id="import-data">导入备份 ↙</button><input id="import-file" type="file" accept="application/json,.json" hidden></div></div>
     <div class="stats-panel">
       <div class="stats"><div><strong id="stat-steps">0</strong><span>已完成的小步</span></div><div><strong id="stat-minutes">0</strong><span>累计专注 / 分钟</span></div><div><strong id="stat-goals">0</strong><span>已达成的目标</span></div></div>
       <div class="stats-view-switch" role="group" aria-label="专注统计范围"><button id="stats-year-view" type="button" aria-pressed="true" aria-controls="annual-stats">全年 12 个月</button><button id="stats-week-view" type="button" aria-pressed="false" aria-controls="weekly-stats">最近 7 天</button></div>
       <section id="weekly-stats" aria-label="最近七天专注统计" hidden><div class="week-heading"><span>最近 7 天的专注</span><span id="week-total">0 分钟</span></div><div id="week-chart" class="week-chart" aria-label="最近七天专注时长"></div></section>
       <section id="annual-stats" aria-label="全年专注统计">
-        <div class="annual-heading"><span>把每个月的努力，放在一起。</span><div class="year-navigation"><button id="year-prev" type="button" aria-label="查看更早年份">‹</button><label class="sr-only" for="focus-year">统计年份</label><select id="focus-year" aria-label="统计年份"></select><button id="year-next" type="button" aria-label="查看更新年份">›</button></div></div>
+        <div class="annual-heading"><span>全年专注趋势</span><div class="year-navigation"><button id="year-prev" type="button" aria-label="查看更早年份">‹</button><label class="sr-only" for="focus-year">统计年份</label><select id="focus-year" aria-label="统计年份"></select><button id="year-next" type="button" aria-label="查看更新年份">›</button></div></div>
         <div class="annual-summary" aria-live="polite"><strong id="annual-duration">0 分钟</strong><span id="annual-description">0 次专注 · 0 个活跃日</span></div>
         <div class="annual-chart-scroll"><div id="annual-chart" class="annual-chart" role="img" aria-label="全年各月专注时长"></div></div>
         <p id="annual-empty" class="annual-empty" hidden>这一年还没有专注记录。每一个开始，都会慢慢积累在这里。</p>
@@ -66,6 +76,6 @@
 <footer class="wrap footer"><span>下一小步 <span class="footer-mark">✳</span> 让想法慢慢发生。</span><span>本地保存 · 无需登录 · 不上传目标内容</span></footer>
 <dialog id="goal-dialog"><form id="goal-form"><div class="dialog-heading"><span class="eyebrow">MAKE ROOM FOR AN IDEA</span><button type="button" class="close-button" data-close="goal-dialog" aria-label="关闭">×</button></div><h2 id="goal-dialog-title">你想让什么发生？</h2><label for="goal-name">给目标起个名字</label><input id="goal-name" maxlength="100" required placeholder="例如：做一个能展示的毕业作品"><label for="goal-reason">为什么想做它 <span class="optional">选填</span></label><input id="goal-reason" maxlength="240" placeholder="留一句话，给以后想放弃的自己。"><div id="new-steps-fields"><label for="goal-steps">拆成几小步 <span class="optional">每行一个，可稍后添加</span></label><textarea id="goal-steps" rows="4" placeholder="写下作品要解决的一个问题&#10;画出第一版页面草图&#10;完成最小可运行版本"></textarea><div class="template-row"><span>需要一点灵感？</span><button type="button" data-template="learn">学习</button><button type="button" data-template="create">创作</button><button type="button" data-template="career">求职</button></div></div><p class="form-error" id="goal-error" role="alert"></p><button class="button primary" type="submit">把想法放在这里 <span>↗</span></button></form></dialog>
 <dialog id="confirm-dialog"><h2 id="confirm-title"></h2><p id="confirm-body"></p><div class="confirm-actions"><button class="button secondary" id="confirm-no">取消</button><button class="button primary" id="confirm-yes">确认</button></div></dialog>
-<dialog id="guide-dialog"><div class="dialog-heading"><span class="eyebrow">A GENTLE WAY TO BEGIN</span><button class="close-button" data-close="guide-dialog" aria-label="关闭">×</button></div><h2>把事情，变得可以开始。</h2><ol class="guide-list"><li><strong>写下一个想做的目标</strong><p>学习、作品、求职，或者一个一直搁着的念头。</p></li><li><strong>拆到足够小</strong><p>用一个动词开始：读两页、画一张草图、改一段代码。你来决定具体行动，模板只提供起点。</p></li><li><strong>给它一段完整时间</strong><p>选择行动，开始 10、25 或 45 分钟计时。可以暂停；提前完成时会记录已计时的时长。计时结束不自动勾选行动，由你确认完成。</p></li><li><strong>记得带走自己的进度</strong><p>数据只保存在当前浏览器，换设备不会自动同步。请定期导出 JSON 备份；清理浏览器数据可能删除进度。关闭页面后，运行中的计时仍按实际时钟计算，重新打开时补记结束记录；它不检测你是否真的在工作。</p></li></ol></dialog>
+<dialog id="guide-dialog"><div class="dialog-heading"><span class="eyebrow">A GENTLE WAY TO BEGIN</span><button class="close-button" data-close="guide-dialog" aria-label="关闭">×</button></div><h2>把事情，变得可以开始。</h2><ol class="guide-list"><li><strong>写下一个想做的目标</strong><p>学习、作品、求职，或者一个一直搁着的念头。</p></li><li><strong>拆到足够小</strong><p>用一个动词开始：读两页、画一张草图、改一段代码。你来决定具体行动，模板只提供起点。</p></li><li><strong>给它一段完整时间</strong><p>选择行动后开始专注，可在设置中调整专注、短休息、长休息和轮次。完成一段后手动开始下一段；休息不计入专注统计。可以暂停或提前完成，计时结束不自动勾选行动。</p></li><li><strong>给每天和未来留出位置</strong><p>在日历里选一天安排待办，或从“未安排”“已逾期”整理事项。重要日期可以置顶、分类、每年重复，倒数到来，也记录已经走过的天数。</p></li><li><strong>记得带走自己的进度</strong><p>数据只保存在当前浏览器，换设备不会自动同步。请定期导出 JSON 备份；清理浏览器数据可能删除进度。关闭页面后，运行中的计时仍按实际时钟计算，重新打开时只补记已结束的单段计时，不自动循环，不提供后台到时通知。它不检测你是否真的在工作。</p></li></ol></dialog>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </body></html>

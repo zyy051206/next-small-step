@@ -1,0 +1,36 @@
+{
+  "name": "next-small-step-desktop",
+  "version": "2.0.0",
+  "private": true,
+  "description": "下一小步：离线目标、日历待办与番茄专注桌面应用",
+  "author": "zyy051206",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "make-icon": "electron make-icon.cjs",
+    "build:win": "npm run make-icon && electron-builder --win portable --x64 --publish never",
+    "smoke": "node smoke.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "io.github.zyy051206.nextstep.desktop",
+    "productName": "下一小步",
+    "copyright": "Copyright © 2026 zyy051206",
+    "asar": true,
+    "directories": { "output": "release" },
+    "files": ["main.cjs", "preload.cjs", "icon.ico", "package.json"],
+    "extraResources": [{ "from": "../dist", "to": "web", "filter": ["**/*"] }],
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "icon": "icon.ico",
+      "executableName": "NextSmallStep"
+    },
+    "portable": {
+      "requestExecutionLevel": "user",
+      "artifactName": "next-small-step-${version}-windows-${arch}.exe"
+    }
+  }
+}
