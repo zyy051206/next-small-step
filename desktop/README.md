@@ -1,6 +1,6 @@
 # 下一小步 · Windows
 
-双击 `next-small-step-2.0.1-windows-x64.exe` 即可运行，无需安装 Node.js、浏览器扩展或本地服务器。支持 Windows 10/11 x64。网页资源随 EXE 打包，离线可用。
+双击 `next-small-step-2.0.2-windows-x64.exe` 即可运行，无需安装 Node.js、浏览器扩展或本地服务器。支持 Windows 10/11 x64。网页资源随 EXE 打包，离线可用。
 
 2.0.1 移除了顶部的“文件 / 编辑 / 视图”菜单栏，并包含分页布局与最新修复。外观设置支持选择本地背景图片、调整浅色遮罩和自定义应用内图标与 Logo 颜色，重开应用后保留设置。
 
@@ -12,7 +12,13 @@
 
 “导出备份”使用 Windows 系统保存对话框。只有文件保存完成后才提示成功；取消操作会显示已取消。同名文件遵循系统的覆盖确认。“导入备份”使用系统文件选择器，网页验证内容并在覆盖当前进度前要求确认。
 
-应用关闭后不运行后台服务、不提供后台提醒；重新打开后依据保存的时钟状态校准计时。没有自动更新模块。
+应用关闭后不运行后台服务、不提供后台提醒；重新打开后依据保存的时钟状态校准计时。
+
+## 检查更新
+
+2.0.2 起，打开应用会检查 GitHub 正式版本，发现新版后显示提醒；也可以从“检查更新”入口手动检查并查看版本说明。离线或更新服务不可用时，原有功能仍可使用。
+
+点击下载后，应用将已验证的官方 EXE 下载链接交给系统浏览器。下载完成后，退出当前应用并打开新版 EXE，即可继续使用原有进度、背景和图标颜色。此便携版本不会在后台覆盖正在运行的 EXE，也不会自动运行下载的文件。2.0.1 及以前的版本需要先手动下载一次新版，之后才具备检查更新功能。
 
 ## 构建
 
@@ -20,6 +26,7 @@
 
 ```sh
 npm ci
+npm test
 npm run build:win
 npm run smoke
 ```
@@ -30,6 +37,8 @@ GitHub 的 **Windows EXE** 工作流会在 Windows runner 构建实际分发的 
 
 开发运行：`npm start`。开发 smoke：`node smoke.cjs --dev`。直接使用 `--smoke-test` 启动 EXE 也会建立独立临时数据目录，不会读取或修改真实用户进度。测试不清理其他用户文件。
 
-桌面壳启用 `contextIsolation`、渲染器 sandbox，禁用 Node 注入和 webview，默认拒绝权限、外部导航与新窗口。页面通过固定 `nextstep://app` 本地协议加载，拒绝访问其他资源与外部网络。预加载脚本只暴露只读的 `NextStepDesktop.platform` 标记。
+桌面壳启用 `contextIsolation`、渲染器 sandbox，禁用 Node 注入和 webview，默认拒绝权限、外部导航与新窗口。页面通过固定 `nextstep://app` 本地协议加载，拒绝访问其他资源与外部网络。原生进程仅为更新查询访问固定的 GitHub Releases 接口，不发送用户进度或凭据；只接受稳定版本及项目官方、名称匹配的 Windows 附件地址。预加载脚本暴露只读的 `NextStepDesktop.platform` 标记和用途固定的 `NextStepUpdates` 方法，不接受网页传来的 URL 或文件路径。
+
+`npm test` 验证版本排序、正式版本和附件匹配、恶意下载地址拒绝、网络失败/超时/响应大小限制及重复请求合并。EXE smoke 还验证真实隔离桥接的版本读取、更新结果和下载交接；测试使用固定原生数据，不连接更新服务或打开浏览器。
 
 参考：[Electron 稳定版本](https://releases.electronjs.org/release?channel=stable)、[Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security)、[原生下载保存窗口](https://www.electronjs.org/docs/latest/api/download-item)、[electron-builder Windows portable](https://www.electron.build/nsis/)。

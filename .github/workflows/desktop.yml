@@ -36,6 +36,8 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Install the locked desktop dependencies
         run: npm ci --no-audit --no-fund
+      - name: Verify update parsing and download boundaries
+        run: npm test
       - name: Build the offline portable EXE
         run: npm run build:win
       - name: Smoke test the actual EXE across two launches

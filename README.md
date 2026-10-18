@@ -1,6 +1,6 @@
 # 下一小步
 
-一个把目标变成小行动的本地优先工具。原生 HTML / CSS / JavaScript，无外部字体、接口或运行依赖。
+一个把目标变成小行动的本地优先工具。原生 HTML / CSS / JavaScript，核心功能无需联网；原生应用可联网检查公开的新版本。
 
 **Windows EXE + 安卓 APK + 电脑/手机网页**，使用同一份界面和备份格式，离线可用。各端不自动同步，可以用 JSON 备份迁移。
 
@@ -10,13 +10,13 @@
 
 ## 打开
 
-在 [v2.0.1 发布页](https://github.com/zyy051206/next-small-step/releases/tag/v2.0.1) 选择：
+在 [v2.0.2 发布页](https://github.com/zyy051206/next-small-step/releases/tag/v2.0.2) 选择：
 
 | 平台 | 下载与运行 |
 | --- | --- |
-| Windows 10/11 x64 | [下载 2.0.1 EXE](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-2.0.1-windows-x64.exe)，关闭旧程序后双击运行 |
-| Android 8.0 及以上 | [下载 2.0.1 APK](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-2.0.1.apk)，传到手机覆盖安装 |
-| 电脑/手机浏览器 | 在线网页；或[下载网页 ZIP](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-browser-2.0.1.zip)，在电脑解压后打开 `index.html` |
+| Windows 10/11 x64 | [下载 2.0.2 EXE](https://github.com/zyy051206/next-small-step/releases/download/v2.0.2/next-small-step-2.0.2-windows-x64.exe)，关闭旧程序后双击运行 |
+| Android 8.0 及以上 | [下载 2.0.2 APK](https://github.com/zyy051206/next-small-step/releases/download/v2.0.2/next-small-step-2.0.2.apk)，传到手机覆盖安装 |
+| 电脑/手机浏览器 | 在线网页；或[下载网页 ZIP](https://github.com/zyy051206/next-small-step/releases/download/v2.0.2/next-small-step-browser-2.0.2.zip)，在电脑解压后打开 `index.html` |
 
 EXE 未做 Windows 数字签名，系统可能显示未知发布者；发布页提供 SHA-256 校验值。iPhone 使用网页版。
 
@@ -47,10 +47,17 @@ node serve.cjs
 - 手机布局、键盘操作、减少动态效果支持。
 - 安卓 APK 内置页面，离线运行；通过系统文件选择器导入和导出备份。
 - Windows EXE 内置页面，离线运行；备份通过系统窗口保存，升级 EXE 保留本机进度。
+- EXE / APK 提供“检查更新”：启动时自动检查，并在应用使用期间每隔六小时检查；发现新版显示不打断操作的提醒，也可关闭自动检查。
+
+## 检查与下载更新
+
+从 v2.0.2 起，电脑版和安卓版可以在导航区点击“检查更新”（窄屏为循环箭头图标），查看当前版本、更新说明和下载大小，再直接打开对应 EXE / APK 的下载。系统浏览器负责下载；Windows 关闭旧程序后打开新版 EXE，Android 打开 APK 按系统提示覆盖安装，无需卸载旧版。保持同一设备的数据目录及应用签名，记录和外观继续保留。
+
+旧版没有检查更新功能，第一次需要从发布页手动下载 v2.0.2 或更新版本。此功能仅在应用运行时检查，不提供静默安装或应用关闭后的推送。只有公开的 GitHub 版本查询会联网，不发送目标、专注记录、图片或登录凭据；断网不会影响原有功能。网页版本不显示此原生安装包更新入口。
 
 ## 安卓安装与迁移
 
-在 [Releases](https://github.com/zyy051206/next-small-step/releases) 下载 `next-small-step-2.0.1.apk`，传到安卓手机并打开安装。支持 Android 8.0 及以上，建议使用更新后的 Android System WebView。手机可能要求允许此次来源安装应用。新版沿用正式版签名，可覆盖安装 v1.1.0 / v2.0.0；升级前建议导出备份。
+在 [Releases](https://github.com/zyy051206/next-small-step/releases) 下载 `next-small-step-2.0.2.apk`，传到安卓手机并打开安装。支持 Android 8.0 及以上，建议使用更新后的 Android System WebView。手机可能要求允许此次来源安装应用。新版沿用正式版签名，可覆盖安装 v1.1.0 / v2.0.0；升级前建议导出备份。
 
 电脑已有进度：先在原网页点“导出备份”，把 JSON 文件传到手机，再在 App 中点“导入备份”。导入会在确认后替换目标设备的现有数据，不会自动合并。卸载 App 会清除其本地数据，请先备份。iPhone 可使用网页版本，不能安装 APK。
 

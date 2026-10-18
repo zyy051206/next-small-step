@@ -33,7 +33,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-/** Offline UI plus the two document-picker operations that a WebView needs. */
+/** Local UI, system document pickers, and a narrowly scoped native update checker. */
 public final class MainActivity extends Activity {
     private static final String ORIGIN = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + ORIGIN + "/assets/index.html";
@@ -45,6 +45,8 @@ public final class MainActivity extends Activity {
     private volatile boolean exportPending;
     private String pendingResult;
     private boolean pageReady;
+    private AppUpdater updater;
+    private String pendingUpdateResult;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override public void onCreate(Bundle state) {
@@ -83,6 +85,11 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(true);
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         webView.addJavascriptInterface(new BackupBridge(), "NextStepAndroid");
+        updater = new AppUpdater(this, detail -> {
+            pendingUpdateResult = detail.toString();
+            dispatchUpdateResult();
+        });
+        webView.addJavascriptInterface(updater, "NextStepUpdates");
 
         WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this)).build();
@@ -99,6 +106,7 @@ public final class MainActivity extends Activity {
             @Override public void onPageFinished(WebView view, String url) {
                 pageReady = isLocalPage(Uri.parse(url));
                 if (pageReady && pendingResult != null) dispatchBackupResult();
+                if (pageReady && pendingUpdateResult != null) dispatchUpdateResult();
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -242,6 +250,13 @@ public final class MainActivity extends Activity {
         pendingResult = null;
     }
 
+    private void dispatchUpdateResult() {
+        if (webView == null || isDestroyed() || !pageReady || pendingUpdateResult == null) return;
+        webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('nextstep-update-result',{detail:"
+                + pendingUpdateResult + "}));", null);
+        pendingUpdateResult = null;
+    }
+
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putBoolean("exportPending", exportPending);
         out.putString("pendingResult", pendingResult);
@@ -270,9 +285,11 @@ public final class MainActivity extends Activity {
     @Override public void onBackPressed() { handleBack(); }
 
     @Override protected void onDestroy() {
+        if (updater != null) updater.close();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         if (webView != null) {
             webView.removeJavascriptInterface("NextStepAndroid");
+            webView.removeJavascriptInterface("NextStepUpdates");
             webView.destroy();
             webView = null;
         }

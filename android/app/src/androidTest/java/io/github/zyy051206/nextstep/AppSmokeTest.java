@@ -6,6 +6,7 @@ import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
+import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -60,6 +61,9 @@ public final class AppSmokeTest {
             awaitPage(scenario);
             assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
             assertEquals("\"function\"", evaluate(scenario, "typeof NextStepAndroid.saveBackup"));
+            assertEquals("\"" + BuildConfig.VERSION_NAME + "\"", evaluate(scenario, "NextStepUpdates.getVersion()"));
+            assertEquals("\"android\"", evaluate(scenario, "NextStepUpdates.getPlatform()"));
+            assertEquals("\"function\"", evaluate(scenario, "typeof NextStepUpdates.checkUpdates"));
             assertEquals("true", evaluate(scenario, "document.body.textContent.includes('下一小步')"));
             evaluate(scenario, "{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;canvas.getContext('2d').fillRect(0,0,2,2);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'android-background.png',{type:'image/png'}));const input=document.getElementById('appearance-bg-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-icon-color=\"#7054a4\"]').click();});}");
             long backgroundDeadline = SystemClock.elapsedRealtime() + 8_000;
@@ -98,6 +102,31 @@ public final class AppSmokeTest {
             long deadline = SystemClock.elapsedRealtime() + 3_000;
             while (SystemClock.elapsedRealtime() < deadline && !"false".equals(evaluate(scenario, "document.getElementById('guide-dialog').open"))) SystemClock.sleep(100);
             assertEquals("false", evaluate(scenario, "document.getElementById('guide-dialog').open"));
+        }
+    }
+
+    @Test public void updateDownloadRequiresANativelyValidatedNewVersion() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            awaitPage(scenario);
+            // Isolate this checker from the real page's automatic check, so the test
+            // stays deterministic even when a newer public release exists later.
+            AtomicReference<JSONObject> result = new AtomicReference<>();
+            AtomicReference<AppUpdater> updater = new AtomicReference<>();
+            CountDownLatch done = new CountDownLatch(1);
+            scenario.onActivity(activity -> {
+                AppUpdater checker = new AppUpdater(activity, detail -> { result.set(detail); done.countDown(); });
+                updater.set(checker);
+                checker.downloadUpdate("android_smoke_download");
+            });
+            try {
+                assertTrue("Update bridge did not reply", done.await(5, TimeUnit.SECONDS));
+                assertEquals("android_smoke_download", result.get().getString("requestId"));
+                assertEquals("error", result.get().getString("status"));
+                assertEquals("download", result.get().getString("action"));
+                assertEquals(BuildConfig.VERSION_NAME, result.get().getString("currentVersion"));
+                assertTrue(result.get().getString("message").contains("先检查更新"));
+            } finally { updater.get().close(); }
+            assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
         }
     }
 }
