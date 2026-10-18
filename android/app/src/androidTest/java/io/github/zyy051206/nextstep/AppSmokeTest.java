@@ -154,9 +154,48 @@ public final class AppSmokeTest {
                 assertTrue(install != null);
                 assertEquals("install", install.getString("action"));
                 assertEquals("error", install.getString("status"));
-                assertTrue(install.getString("message").contains("重新下载"));
+                assertTrue(install.getString("message"), install.getString("message").contains("重新下载"));
                 assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
             } finally { updater.get().close(); }
+        }
+    }
+
+    @Test public void cancelCompletionWaitsForCleanupThenAcceptsTheNextOperation() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            awaitPage(scenario);
+            java.util.concurrent.BlockingQueue<JSONObject> results = new java.util.concurrent.LinkedBlockingQueue<>();
+            AtomicReference<AppUpdater> updater = new AtomicReference<>();
+            scenario.onActivity(activity -> updater.set(new AppUpdater(activity, results::offer)));
+            CountDownLatch entered = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            try {
+                // Hold the actual operation worker at a deterministic cleanup boundary.
+                // Reflection is confined to instrumentation; no test-only bridge is shipped.
+                java.lang.reflect.Method begin = AppUpdater.class.getDeclaredMethod("begin", String.class, String.class);
+                java.lang.reflect.Method submit = AppUpdater.class.getDeclaredMethod("submit", Runnable.class);
+                begin.setAccessible(true);
+                submit.setAccessible(true);
+                assertEquals(Boolean.TRUE, begin.invoke(updater.get(), "held_download", "download"));
+                submit.invoke(updater.get(), (Runnable) () -> {
+                    entered.countDown();
+                    try { release.await(5, TimeUnit.SECONDS); }
+                    catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+                });
+                assertTrue(entered.await(5, TimeUnit.SECONDS));
+                updater.get().cancelUpdate("cancel_active");
+                assertTrue("Cancel completed before worker cleanup", results.poll(150, TimeUnit.MILLISECONDS) == null);
+                release.countDown();
+                JSONObject cancelled = results.poll(5, TimeUnit.SECONDS);
+                assertTrue(cancelled != null);
+                assertEquals("cancel_active", cancelled.getString("requestId"));
+                assertEquals("cancelled", cancelled.getString("status"));
+                updater.get().installUpdate("after_cancel");
+                JSONObject next = results.poll(8, TimeUnit.SECONDS);
+                assertTrue(next != null);
+                assertEquals("install", next.getString("action"));
+                assertEquals("error", next.getString("status"));
+                assertTrue(next.getString("message"), next.getString("message").contains("重新下载"));
+            } finally { release.countDown(); updater.get().close(); }
         }
     }
 }

@@ -19,6 +19,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,12 +51,16 @@ public final class AppUpdater implements AutoCloseable {
     private final Listener listener;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean busy = new AtomicBoolean(false);
+    private final Object operationLock = new Object();
+    private final List<String> pendingCancelIds = new ArrayList<>();
+    private final ThreadLocal<List<Runnable>> completedCallbacks = new ThreadLocal<>();
     private final File directory, apk, metadata, part;
     private volatile boolean closed, cancelled, restored;
     private volatile HttpURLConnection connection;
     private volatile Release latest;
     private volatile String status = "idle", message = "", pendingInstallId;
     private volatile long received;
+    private volatile long cancellationGeneration;
 
     AppUpdater(Activity activity, Listener listener) {
         this.activity = activity; this.listener = listener;
@@ -72,22 +78,47 @@ public final class AppUpdater implements AutoCloseable {
 
     private boolean begin(String id, String action) {
         if (!validRequest(id) || closed) return false;
-        if (!busy.compareAndSet(false, true)) {
+        if (!reserveOperation()) {
             report(id, action, "error", "请等待当前更新操作完成，或先取消下载。");
             return false;
         }
-        cancelled = false;
         return true;
     }
+    private boolean reserveOperation() {
+        synchronized (operationLock) {
+            if (closed || !busy.compareAndSet(false, true)) return false;
+            cancelled = false;
+            return true;
+        }
+    }
+    private void finishOperation(List<Runnable> completions) {
+        List<String> cancelIds;
+        synchronized (operationLock) {
+            busy.set(false);
+            cancelIds = new ArrayList<>(pendingCancelIds);
+            pendingCancelIds.clear();
+        }
+        for (Runnable completion : completions) completion.run();
+        for (String id : cancelIds) report(id, "cancel", "cancelled", "已取消当前更新操作。");
+    }
     private void submit(Runnable task) {
-        try { worker.execute(() -> { try { task.run(); } finally { busy.set(false); } }); }
-        catch (RejectedExecutionException error) { busy.set(false); }
+        try { worker.execute(() -> {
+            List<Runnable> completions = new ArrayList<>();
+            completedCallbacks.set(completions);
+            try { task.run(); }
+            finally {
+                completedCallbacks.remove();
+                // A terminal result authorizes the next user action. Finish cleanup
+                // and release the operation lock before delivering that result.
+                finishOperation(completions);
+            }
+        }); }
+        catch (RejectedExecutionException error) { finishOperation(new ArrayList<>()); }
     }
 
     @JavascriptInterface public void getUpdateState(String id) {
         if (!validRequest(id) || closed) return;
-        if (!restored && busy.compareAndSet(false, true)) {
-            cancelled = false;
+        if (!restored && reserveOperation()) {
             submit(() -> {
                 Release cached = restoreReady();
                 if (!stopped()) {
@@ -191,6 +222,7 @@ public final class AppUpdater implements AutoCloseable {
 
     @JavascriptInterface public void installUpdate(String id) {
         if (!begin(id, "install")) return;
+        long installGeneration = cancellationGeneration;
         submit(() -> {
             try {
                 if (!restored) { latest = restoreReady(); restored = true; }
@@ -199,7 +231,9 @@ public final class AppUpdater implements AutoCloseable {
                 // Recheck bytes, package identity, version, and certificates on every install.
                 verifyReady(release);
                 if (stopped()) throw new IOException("Cancelled");
-                activity.runOnUiThread(() -> requestInstall(id));
+                completedCallbacks.get().add(() -> activity.runOnUiThread(() -> {
+                    if (cancellationGeneration == installGeneration) requestInstall(id);
+                }));
             } catch (IOException | SecurityException error) {
                 if (!stopped()) clearReady();
                 status = stopped() && metadata.isFile() && apk.isFile() ? "ready" : latest == null ? "idle" : "available";
@@ -250,10 +284,18 @@ public final class AppUpdater implements AutoCloseable {
 
     @JavascriptInterface public void cancelUpdate(String id) {
         if (!validRequest(id) || closed) return;
-        cancelled = true; pendingInstallId = null;
-        HttpURLConnection request = connection;
+        boolean waitForCleanup;
+        HttpURLConnection request;
+        synchronized (operationLock) {
+            cancelled = true;
+            cancellationGeneration++;
+            pendingInstallId = null;
+            waitForCleanup = busy.get();
+            if (waitForCleanup) pendingCancelIds.add(id);
+            request = connection;
+        }
         if (request != null) request.disconnect();
-        report(id, "cancel", "cancelled", "已取消当前更新操作。");
+        if (!waitForCleanup) report(id, "cancel", "cancelled", "已取消当前更新操作。");
     }
 
     private void verifyReady(Release release) throws IOException {
@@ -294,6 +336,7 @@ public final class AppUpdater implements AutoCloseable {
     private HttpURLConnection configure(URL url) throws IOException {
         HttpURLConnection request = (HttpURLConnection) url.openConnection();
         connection = request;
+        if (stopped()) { request.disconnect(); throw new IOException("Cancelled"); }
         request.setInstanceFollowRedirects(false);
         request.setConnectTimeout(12_000); request.setReadTimeout(20_000); request.setUseCaches(false);
         request.setRequestProperty("User-Agent", "NextSmallStep-Android/" + BuildConfig.VERSION_NAME);
@@ -385,7 +428,12 @@ public final class AppUpdater implements AutoCloseable {
             }
             if (resultMessage != null && !resultMessage.isEmpty()) detail.put("message", resultMessage);
         } catch (JSONException error) { return; }
-        activity.runOnUiThread(() -> { if (!closed && !activity.isDestroyed()) listener.onResult(detail); });
+        Runnable dispatch = () -> activity.runOnUiThread(() -> {
+            if (!closed && !activity.isDestroyed()) listener.onResult(detail);
+        });
+        List<Runnable> completions = completedCallbacks.get();
+        if (completions != null && !"progress".equals(resultStatus)) completions.add(dispatch);
+        else dispatch.run();
     }
     @Override public void close() {
         closed = true; cancelled = true;
