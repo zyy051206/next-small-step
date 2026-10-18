@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, Menu, protocol, session, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, protocol, session, ipcMain } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -30,29 +30,17 @@ const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inl
 let window;
 let smokeDownloadMode = 'save';
 const pageErrors = [];
-let smokeUpdateOpenedUrl = '';
-const smokeUpdateVersion = '999.0.0';
-const smokeUpdateUrl = `https://github.com/zyy051206/next-small-step/releases/download/v${smokeUpdateVersion}/next-small-step-${smokeUpdateVersion}-windows-x64.exe`;
-const updates = createUpdateService({
-  currentVersion: app.getVersion(),
-  // Test mode uses an isolated profile and a fixed fixture; it never opens the
-  // real browser or contacts the update server while checking native IPC.
-  ...(smoke ? {
-    loadRelease: async () => ({ tag_name: `v${smokeUpdateVersion}`, draft: false, prerelease: false,
-      body: 'Windows updater verification', assets: [{ name: `next-small-step-${smokeUpdateVersion}-windows-x64.exe`,
-        browser_download_url: smokeUpdateUrl, state: 'uploaded', size: 123456 }] }),
-    openExternal: async url => { smokeUpdateOpenedUrl = url; }
-  } : { openExternal: url => shell.openExternal(url) })
-});
+let updates;
+let smokeUpdater;
 
-for (const action of ['check', 'download']) {
+for (const action of ['check', 'download', 'install', 'cancel', 'state']) {
   ipcMain.handle(`nextstep-update-${action}`, async (event, requestId) => {
     if (!window || window.isDestroyed() || event.sender !== window.webContents
         || event.senderFrame !== event.sender.mainFrame || !localUrl(event.senderFrame.url, true)
         || typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(requestId)) {
       throw new Error('Update request denied');
     }
-    return { requestId, action, ...await updates[action]() };
+    return { requestId, action, ...await updates[action](requestId) };
   });
 }
 
@@ -71,6 +59,15 @@ function reportBackup(contents, status, message) {
 }
 
 async function configureSession() {
+  // The updater uses its own native network session; page requests stay offline.
+  smokeUpdater = smoke ? await require('./update-smoke.cjs').createSmokeUpdater(app, smokeRoot) : null;
+  updates = createUpdateService({ currentVersion: app.getVersion(),
+    updater: smokeUpdater ? smokeUpdater.updater : require('electron-updater').autoUpdater,
+    beforeInstall: async () => session.defaultSession.flushStorageData(),
+    notify: detail => {
+      if (window && !window.isDestroyed()) window.webContents.send('nextstep-update-progress', detail);
+    }
+  });
   const assets = app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(__dirname, '../dist');
   protocol.handle('nextstep', async request => {
     if (!localUrl(request.url) || request.method !== 'GET') return new Response('', { status: 403 });
@@ -172,12 +169,22 @@ async function runSmoke() {
   await check(`NextStepUpdates.getVersion()===${JSON.stringify(app.getVersion())} && NextStepUpdates.getPlatform()==='windows'`, 'updater bridge reports packaged version and platform');
   await evaluate("window.updateResults={};window.addEventListener('nextstep-update-result',event=>{window.updateResults[event.detail.requestId]=event.detail});NextStepUpdates.checkUpdates('smoke-check')");
   await waitFor("window.updateResults['smoke-check']", 'native update check reply');
-  await check("window.updateResults['smoke-check'].status==='available' && window.updateResults['smoke-check'].version==='999.0.0' && !('url' in window.updateResults['smoke-check'])", 'native update check validates release and exposes no arbitrary URL bridge');
+  await check("window.updateResults['smoke-check'].status==='available' && window.updateResults['smoke-check'].version==='999.0.0' && !('url' in window.updateResults['smoke-check'])", 'real NSIS updater check validates the controlled release through the isolated bridge');
+  smokeUpdater.corruptNextDownload();
+  await evaluate("NextStepUpdates.downloadUpdate('smoke-corrupt')");
+  await waitFor("window.updateResults['smoke-corrupt']?.status==='error'", 'corrupted installer rejection');
+  checks.push('real NSIS downloader rejects an installer whose SHA512 does not match');
   await evaluate("NextStepUpdates.downloadUpdate('smoke-download')");
-  await waitFor("window.updateResults['smoke-download']", 'native download handoff reply');
-  await check("window.updateResults['smoke-download'].status==='opened'", 'update download handoff is reported through the native bridge');
-  if (smokeUpdateOpenedUrl !== smokeUpdateUrl) throw new Error('Update download must use the validated native release URL');
-  checks.push('update download uses only the cached official release asset');
+  await waitFor("window.updateResults['smoke-download']?.status==='ready'", 'verified native download completion');
+  await check("window.updateResults['smoke-download'].percent===100", 'native NSIS download completes SHA512 verification without opening a browser');
+  await evaluate("NextStepUpdates.getUpdateState('smoke-state')");
+  await waitFor("window.updateResults['smoke-state']", 'native update state reply');
+  await check("window.updateResults['smoke-state'].status==='ready'", 'downloaded update is recoverable when the update panel is reopened');
+  await evaluate("NextStepUpdates.installUpdate('smoke-install')");
+  await waitFor("window.updateResults['smoke-install']?.status==='installing'", 'explicit native installation request');
+  await wait(500);
+  smokeUpdater.verifyInstall();
+  checks.push('real NSIS install command targets only its verified cached file and requests restart');
   await check("!!document.querySelector('#planner') && !!document.querySelector('#important-dates')", 'calendar and important-date panels loaded');
   if (smokePhase === 'seed' || smokePhase === 'full') {
     await evaluate("new Promise(resolve=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;const context=canvas.getContext('2d');context.fillStyle='#f4eee2';context.fillRect(0,0,2,2);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'native-background.png',{type:'image/png'}));const input=document.querySelector('#appearance-bg-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-icon-color=\"#7054a4\"]').click();resolve(true);});})");
@@ -217,6 +224,7 @@ async function runSmoke() {
   const screenshot = await window.webContents.capturePage(undefined, { stayHidden: true });
   fs.writeFileSync(path.join(smokeRoot, `${smokePhase}.png`), screenshot.toPNG());
   fs.writeFileSync(path.join(smokeRoot, `${smokePhase}.json`), JSON.stringify({ success: true, version: app.getVersion(), phase: smokePhase, checks }, null, 2));
+  await smokeUpdater.close();
   app.quit();
 }
 

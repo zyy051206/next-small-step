@@ -1,26 +1,22 @@
 # 下一小步 · Windows
 
-双击 `next-small-step-2.0.2-windows-x64.exe` 即可运行，无需安装 Node.js、浏览器扩展或本地服务器。支持 Windows 10/11 x64。网页资源随 EXE 打包，离线可用。
+运行 `next-small-step-2.0.3-windows-x64.exe`，按提示安装后使用。支持 Windows 10/11 x64，默认安装到当前用户目录，无需管理员权限。网页资源随应用打包，离线可用。
 
-2.0.1 移除了顶部的“文件 / 编辑 / 视图”菜单栏，并包含分页布局与最新修复。外观设置支持选择本地背景图片、调整浅色遮罩和自定义应用内图标与 Logo 颜色，重开应用后保留设置。
+2.0.3 使用 NSIS 安装版，支持应用内下载、取消、重试和重启安装。旧版便携 EXE 用户需先安装一次 2.0.3；之后的新版本可以直接在应用内更新。请关闭旧版便携程序，再启动安装后的新版。
 
-此版本**未进行 Windows 数字签名**，系统可能显示未知发布者。请从项目所有者提供的发布链接下载，并可核对同目录的 SHA256SUMS.txt。
+此版本**未进行 Windows 数字签名**，系统可能显示未知发布者。请从项目官方 GitHub Releases 下载，并可核对同目录的 SHA256SUMS.txt。
 
-## 进度与备份
+## 更新与进度
 
-进度固定保存在 `%APPDATA%\NextSmallStep`，不会随便携 EXE 的解压目录或版本号改变。替换 EXE 后仍读取同一份进度；删除这个数据目录会删除本机数据。桌面版、网页版和 Android 版的数据彼此独立，通过 JSON 导出/导入迁移。不会读取用户浏览器的个人配置或存储。
+打开应用会检查 GitHub 正式版本，也可以手动选择“检查更新”。发现新版后显示版本说明；点击“下载更新”后，应用直接下载并显示进度，支持取消和重试。下载完成后点击“重启并安装”，应用保存数据、退出并启动 NSIS 更新，完成后重新打开。不会打开浏览器，也不需要手动寻找安装包。
 
-“导出备份”使用 Windows 系统保存对话框。只有文件保存完成后才提示成功；取消操作会显示已取消。同名文件遵循系统的覆盖确认。“导入备份”使用系统文件选择器，网页验证内容并在覆盖当前进度前要求确认。
+仅用户明确选择安装时才会更新。正常退出、关机或取消下载都不会自动安装。下载后的文件通过 SHA512 校验，安装前再次核对，校验失败时要求重新下载。更新服务不可用不影响原有离线功能。
 
-应用关闭后不运行后台服务、不提供后台提醒；重新打开后依据保存的时钟状态校准计时。
+进度仍保存在 `%APPDATA%\NextSmallStep`，从便携版迁移和后续更新都读取同一份数据；删除这个目录会删除本机数据。桌面版、网页版和 Android 版数据彼此独立，通过 JSON 导出/导入迁移。背景和图标颜色保留在当前设备，不包含在 JSON 备份中。
 
-## 检查更新
+“导出备份”使用 Windows 系统保存对话框，仅在保存完成后提示成功；取消时反馈已取消。同名文件遵循系统覆盖确认。应用关闭后不运行后台服务，重新打开后根据保存的时钟状态恢复计时。
 
-2.0.2 起，打开应用会检查 GitHub 正式版本，发现新版后显示提醒；也可以从“检查更新”入口手动检查并查看版本说明。离线或更新服务不可用时，原有功能仍可使用。
-
-点击下载后，应用将已验证的官方 EXE 下载链接交给系统浏览器。下载完成后，退出当前应用并打开新版 EXE，即可继续使用原有进度、背景和图标颜色。此便携版本不会在后台覆盖正在运行的 EXE，也不会自动运行下载的文件。2.0.1 及以前的版本需要先手动下载一次新版，之后才具备检查更新功能。
-
-## 构建
+## 构建与发布
 
 使用 Node.js 24，在 `desktop` 目录执行：
 
@@ -31,14 +27,22 @@ npm run build:win
 npm run smoke
 ```
 
-固定依赖 Electron 44.9.0、electron-builder 26.17.0，全部间接依赖记录于 `package-lock.json`。构建时从项目自己的 `dist/icon.svg` 生成品牌 ICO，再将同一份 `dist/` 打包为 Windows x64 portable EXE。输出位于 `desktop/release/`。
+固定依赖 Electron 44.9.0、electron-builder 26.17.0 和 electron-updater 6.8.9，间接依赖记录于 `package-lock.json`。品牌 ICO 从项目的 `dist/icon.svg` 生成。Windows 构建输出在 `desktop/release/`，每次正式发布需一起上传：
 
-GitHub 的 **Windows EXE** 工作流会在 Windows runner 构建实际分发的 EXE，然后启动该 EXE 两次，验证菜单栏已移除、离线页面、隔离的渲染环境、目标/计时和自定义背景/图标色跨进程持久化、真实 JSON 备份导出/取消与全年统计，成功后才上传 `next-small-step-windows` 附件。`windows-verification` 附件提供检查报告与截图。
+- `next-small-step-版本号-windows-x64.exe`：当前用户 NSIS 安装程序。
+- 对应的 `.exe.blockmap`：差分更新元数据。
+- `latest.yml`：版本、安装包大小与 SHA512，供已安装版本检查更新。
 
-开发运行：`npm start`。开发 smoke：`node smoke.cjs --dev`。直接使用 `--smoke-test` 启动 EXE 也会建立独立临时数据目录，不会读取或修改真实用户进度。测试不清理其他用户文件。
+GitHub 更新源固定为 `zyy051206/next-small-step`，拒绝预发布、降级、任意文件名和 NSIS 网络安装程序。`autoDownload` 与 `autoInstallOnAppQuit` 均关闭；明确点击后才下载和安装。更新使用独立的原生网络会话，不向服务发送用户目标、计时或背景图片。
 
-桌面壳启用 `contextIsolation`、渲染器 sandbox，禁用 Node 注入和 webview，默认拒绝权限、外部导航与新窗口。页面通过固定 `nextstep://app` 本地协议加载，拒绝访问其他资源与外部网络。原生进程仅为更新查询访问固定的 GitHub Releases 接口，不发送用户进度或凭据；只接受稳定版本及项目官方、名称匹配的 Windows 附件地址。预加载脚本暴露只读的 `NextStepDesktop.platform` 标记和用途固定的 `NextStepUpdates` 方法，不接受网页传来的 URL 或文件路径。
+## 验证
 
-`npm test` 验证版本排序、正式版本和附件匹配、恶意下载地址拒绝、网络失败/超时/响应大小限制及重复请求合并。EXE smoke 还验证真实隔离桥接的版本读取、更新结果和下载交接；测试使用固定原生数据，不连接更新服务或打开浏览器。
+`npm test` 覆盖版本和元数据验证、下载进度、取消/重试、超时、损坏文件、安装前篡改校验和重复安装防护。
 
-参考：[Electron 稳定版本](https://releases.electronjs.org/release?channel=stable)、[Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security)、[原生下载保存窗口](https://www.electronjs.org/docs/latest/api/download-item)、[electron-builder Windows portable](https://www.electron.build/nsis/)。
+`npm run smoke` 从实际 NSIS 安装包提取应用到独立临时目录，启动两次验证离线页面、数据/背景/图标色持久化、备份和全年统计。原生更新测试使用真实 `NsisUpdater` 和仅绑定本机回环地址的临时服务，验证下载、损坏文件拒绝、重试以及安装/重启参数；最终启动安装进程的调用被拦截，不修改本机已安装程序或注册表。测试报告记录安装包 SHA256 及该验证边界。
+
+开发运行：`npm start`。开发验证：`node smoke.cjs --dev`。显式 `--smoke-test` 使用隔离的数据与更新缓存，不读取或改写真实进度。
+
+桌面壳保留 `contextIsolation`、sandbox、无 Node 注入和无 webview 的边界；页面只通过 `nextstep://app` 加载本地资源。`NextStepUpdates` 仅接受请求标识，不接受网页传来的 URL、文件路径或命令。
+
+参考：[electron-builder v26 更新文档](https://www.electron.build/v26/docs/features/auto-update/)、[NSIS 配置](https://www.electron.build/nsis/)、[Electron 安全指南](https://www.electronjs.org/docs/latest/tutorial/security)。

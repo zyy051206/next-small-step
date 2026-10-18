@@ -64,6 +64,9 @@ public final class AppSmokeTest {
             assertEquals("\"" + BuildConfig.VERSION_NAME + "\"", evaluate(scenario, "NextStepUpdates.getVersion()"));
             assertEquals("\"android\"", evaluate(scenario, "NextStepUpdates.getPlatform()"));
             assertEquals("\"function\"", evaluate(scenario, "typeof NextStepUpdates.checkUpdates"));
+            assertEquals("\"function\"", evaluate(scenario, "typeof NextStepUpdates.installUpdate"));
+            assertEquals("\"function\"", evaluate(scenario, "typeof NextStepUpdates.cancelUpdate"));
+            assertEquals("\"function\"", evaluate(scenario, "typeof NextStepUpdates.getUpdateState"));
             assertEquals("true", evaluate(scenario, "document.body.textContent.includes('下一小步')"));
             evaluate(scenario, "{const canvas=document.createElement('canvas');canvas.width=canvas.height=2;canvas.getContext('2d').fillRect(0,0,2,2);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'android-background.png',{type:'image/png'}));const input=document.getElementById('appearance-bg-file');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('[data-icon-color=\"#7054a4\"]').click();});}");
             long backgroundDeadline = SystemClock.elapsedRealtime() + 8_000;
@@ -127,6 +130,33 @@ public final class AppSmokeTest {
                 assertTrue(result.get().getString("message").contains("先检查更新"));
             } finally { updater.get().close(); }
             assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
+        }
+    }
+
+    @Test public void updaterRestoresIdleStateAndBlocksInstallWithoutVerifiedApk() throws Exception {
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+            awaitPage(scenario);
+            java.util.concurrent.BlockingQueue<JSONObject> results = new java.util.concurrent.LinkedBlockingQueue<>();
+            AtomicReference<AppUpdater> updater = new AtomicReference<>();
+            scenario.onActivity(activity -> updater.set(new AppUpdater(activity, results::offer)));
+            try {
+                updater.get().getUpdateState("state_smoke");
+                JSONObject state = results.poll(8, TimeUnit.SECONDS);
+                assertTrue("State did not resolve", state != null);
+                assertEquals("state", state.getString("action"));
+                assertEquals("idle", state.getString("status"));
+                updater.get().cancelUpdate("cancel_smoke");
+                JSONObject cancel = results.poll(5, TimeUnit.SECONDS);
+                assertTrue(cancel != null);
+                assertEquals("cancelled", cancel.getString("status"));
+                updater.get().installUpdate("install_smoke");
+                JSONObject install = results.poll(8, TimeUnit.SECONDS);
+                assertTrue(install != null);
+                assertEquals("install", install.getString("action"));
+                assertEquals("error", install.getString("status"));
+                assertTrue(install.getString("message").contains("重新下载"));
+                assertEquals("\"https://appassets.androidplatform.net\"", evaluate(scenario, "location.origin"));
+            } finally { updater.get().close(); }
         }
     }
 }

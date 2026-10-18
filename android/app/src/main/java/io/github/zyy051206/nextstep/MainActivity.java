@@ -89,6 +89,7 @@ public final class MainActivity extends Activity {
             pendingUpdateResult = detail.toString();
             dispatchUpdateResult();
         });
+        if (state != null) updater.restoreInstallRequest(state.getString("pendingInstallRequest"));
         webView.addJavascriptInterface(updater, "NextStepUpdates");
 
         WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
@@ -260,11 +261,13 @@ public final class MainActivity extends Activity {
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putBoolean("exportPending", exportPending);
         out.putString("pendingResult", pendingResult);
+        if (updater != null) out.putString("pendingInstallRequest", updater.pendingInstallRequest());
         super.onSaveInstanceState(out);
     }
 
     @Override protected void onResume() {
         super.onResume();
+        if (updater != null) updater.onResume();
         if (webView != null) {
             webView.onResume();
             webView.evaluateJavascript("window.dispatchEvent(new Event('nextstep-resume'));document.dispatchEvent(new Event('visibilitychange'));", null);

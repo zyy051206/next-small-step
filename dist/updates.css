@@ -11,6 +11,11 @@
 #updates-size { font-size: 11px; color: var(--muted); margin-top: 3px; }
 #updates-notes { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 12px; line-height: 1.8; max-height: 210px; overflow-y: auto; margin-bottom: 0; }
 .updates-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#updates-transfer { margin: 0 0 18px; }
+#updates-progress { display: block; width: 100%; height: 8px; border: 0; border-radius: 8px; overflow: hidden; accent-color: var(--green); }
+#updates-progress::-webkit-progress-bar { background: #e5ebe1; border-radius: 8px; }
+#updates-progress::-webkit-progress-value { background: var(--green); border-radius: 8px; }
+#updates-progress-label { font-size: 11px; color: var(--muted); margin-top: 7px; font-variant-numeric: tabular-nums; }
 .updates-help { font-size: 11px; color: var(--muted); line-height: 1.8; margin-top: 12px; }
 .updates-auto { display: flex; align-items: center; gap: 9px; font-size: 12px; padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
 .updates-auto input { width: 16px; height: 16px; margin: 0; accent-color: var(--green); }

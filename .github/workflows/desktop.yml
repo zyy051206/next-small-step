@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  portable-exe:
+  nsis-exe:
     runs-on: windows-2025
     timeout-minutes: 25
     defaults:
@@ -38,9 +38,9 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Verify update parsing and download boundaries
         run: npm test
-      - name: Build the offline portable EXE
+      - name: Build the offline NSIS installer and updater metadata
         run: npm run build:win
-      - name: Smoke test the actual EXE across two launches
+      - name: Verify the installer payload and native download/install flow
         run: npm run smoke
       - name: Prepare download and checksum
         run: |
@@ -48,9 +48,15 @@ jobs:
           $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
           $artifactName = "next-small-step-$version-windows-x64.exe"
           Copy-Item -LiteralPath "release/$artifactName" -Destination artifacts/
+          Copy-Item -LiteralPath "release/$artifactName.blockmap" -Destination artifacts/
+          Copy-Item -LiteralPath 'release/latest.yml' -Destination artifacts/
           $artifact = Get-Item -LiteralPath "artifacts/$artifactName"
           $checksum = (Get-FileHash -LiteralPath $artifact.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$checksum  $($artifact.Name)" | Set-Content -LiteralPath artifacts/SHA256SUMS.txt -Encoding utf8
+          @($artifactName, "$artifactName.blockmap", 'latest.yml') | ForEach-Object {
+            $file = Get-Item -LiteralPath "artifacts/$_"
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($file.Name)"
+          } | Set-Content -LiteralPath artifacts/SHA256SUMS.txt -Encoding utf8
           @{ version = $version; commit = $env:GITHUB_SHA; platform = 'windows'; arch = 'x64'; file = $artifact.Name; sha256 = $checksum } | ConvertTo-Json | Set-Content -LiteralPath artifacts/build-info.json -Encoding utf8
       - uses: actions/upload-artifact@v4
         with:

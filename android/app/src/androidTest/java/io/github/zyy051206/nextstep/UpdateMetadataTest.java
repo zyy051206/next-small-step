@@ -22,6 +22,7 @@ public final class UpdateMetadataTest {
         String name = "next-small-step-" + version + ".apk";
         JSONObject asset = new JSONObject()
                 .put("name", name).put("state", "uploaded").put("size", 962592)
+                .put("digest", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
                 .put("browser_download_url", "https://github.com/zyy051206/next-small-step/releases/download/v" + version + "/" + name);
         return new JSONObject().put("draft", false).put("prerelease", false)
                 .put("tag_name", "v" + version).put("body", "修复问题并改进界面")
@@ -52,6 +53,7 @@ public final class UpdateMetadataTest {
         assertEquals("2.1.0", newer.version);
         assertEquals("https://github.com/zyy051206/next-small-step/releases/download/v2.1.0/next-small-step-2.1.0.apk", newer.url);
         assertEquals(962592, newer.size);
+        assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", newer.sha256);
         assertEquals("修复问题并改进界面", newer.notes);
         for (String version : new String[]{"2.0.1", "2.0.2"}) {
             AppUpdater.Release current = AppUpdater.parseRelease(release(version), "2.0.2");
@@ -102,5 +104,16 @@ public final class UpdateMetadataTest {
         StringBuilder longNotes = new StringBuilder();
         for (int i = 0; i < 7000; i++) longNotes.append('a');
         assertEquals(6000, AppUpdater.parseRelease(release("2.0.3").put("body", longNotes.toString()), "2.0.2").notes.length());
+    }
+
+    @Test public void requiresGitHubSha256DigestBeforeEnablingDownload() throws Exception {
+        for (Object digest : new Object[]{JSONObject.NULL, "", "md5:abcd", "sha256:abcd", "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}) {
+            JSONObject invalid = release("2.0.3");
+            invalid.getJSONArray("assets").getJSONObject(0).put("digest", digest);
+            rejects(invalid);
+        }
+        JSONObject missing = release("2.0.3");
+        missing.getJSONArray("assets").getJSONObject(0).remove("digest");
+        rejects(missing);
     }
 }

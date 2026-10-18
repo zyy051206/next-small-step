@@ -2,188 +2,158 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { createUpdateService, fetchLatestRelease, releaseInfo, isNewer, LATEST_URL } = require('./updates.cjs');
-
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { createUpdateService, updateInfo, isNewer } = require('./updates.cjs');
+const data = Buffer.from('Verified test installer');
+const sha512 = crypto.createHash('sha512').update(data).digest('base64');
 function release(version = '2.1.0') {
-  const name = `next-small-step-${version}-windows-x64.exe`;
-  return { tag_name: `v${version}`, draft: false, prerelease: false, body: '更新说明',
-    assets: [{ name, state: 'uploaded', size: 123456,
-      browser_download_url: `https://github.com/zyy051206/next-small-step/releases/download/v${version}/${name}` }] };
+  return { version, releaseNotes: '更新说明', files: [{ url: `next-small-step-${version}-windows-x64.exe`, size: data.length, sha512 }] };
 }
-
-function fakeRequest({ status = 200, body = JSON.stringify(release()), headers = {}, error, stall = false } = {}) {
-  const state = { calls: 0, destroyed: false };
-  state.get = (url, options, onResponse) => {
-    state.calls++;
-    state.url = url;
-    state.headers = options.headers;
-    const request = new EventEmitter();
-    request.destroy = () => { state.destroyed = true; };
-    queueMicrotask(() => {
-      if (error) { request.emit('error', error); return; }
-      if (stall) return;
-      const response = new EventEmitter();
-      response.statusCode = status;
-      response.headers = headers;
-      response.resume = () => {};
-      onResponse(response);
-      response.emit('data', Buffer.from(body));
-      response.emit('end');
-    });
-    return request;
-  };
-  return state;
+function fixture(options = {}) {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'next-step-update-unit-'));
+  const file = path.join(folder, 'installer.exe');
+  fs.writeFileSync(file, data);
+  const updater = new EventEmitter();
+  const notifications = [], installs = [];
+  updater.checkForUpdates = async () => ({ updateInfo: release(), isUpdateAvailable: true });
+  updater.downloadUpdate = async () => [file];
+  updater.quitAndInstall = (...args) => installs.push(args);
+  const service = createUpdateService({ currentVersion: '2.0.3', updater,
+    notify: event => notifications.push(event), installDelayMs: 1, ...options });
+  return { service, updater, notifications, installs, file };
 }
+const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-test('numeric semantic versions handle patch, minor, major and no downgrade', () => {
+test('numeric versions compare without downgrades or prereleases', () => {
   assert.equal(isNewer('2.0.10', '2.0.9'), true);
   assert.equal(isNewer('2.10.0', '2.9.9'), true);
-  assert.equal(isNewer('3.0.0', '2.99.99'), true);
-  assert.equal(isNewer('2.0.2', '2.0.2'), false);
-  assert.equal(isNewer('2.0.1', '2.0.2'), false);
+  assert.equal(isNewer('2.0.3', '2.0.3'), false);
+  assert.equal(isNewer('2.0.2', '2.0.3'), false);
+  for (const invalid of ['2.1', '02.1.0', '2.1.0-beta', 'v2.1.0', '2.1.0\n']) assert.throws(() => isNewer(invalid, '2.0.3'));
 });
-
-test('rejects prerelease, malformed, padded and unsafe version numbers', () => {
-  for (const value of ['2.1', 'v2.1.0', '2.1.0-beta', '2.1.0+build', '02.1.0', '2.1.0\n', '9999999999.0.0']) {
-    assert.throws(() => isNewer(value, '2.0.2'));
+test('only exact official NSIS filenames with valid SHA512 and size are accepted', () => {
+  assert.equal(updateInfo(release(), '2.0.3').status, 'available');
+  for (const patch of [{ url: 'https://evil.example/installer.exe' }, { url: 'file:///C:/bad.exe' },
+    { url: 'next-small-step-2.0.0-windows-x64.exe' }, { sha512: 'bad' }, { size: 0 }, { size: 2 ** 32 }]) {
+    const candidate = release(); Object.assign(candidate.files[0], patch);
+    assert.throws(() => updateInfo(candidate, '2.0.3'));
   }
+  assert.throws(() => updateInfo({ ...release(), packages: {} }, '2.0.3'));
+  assert.throws(() => updateInfo({ ...release(), files: [] }, '2.0.3'));
 });
-
-test('new release requires the exact available Windows asset', () => {
-  const candidate = release();
-  const result = releaseInfo(candidate, '2.0.2');
-  assert.equal(result.status, 'available');
-  assert.equal(result.url, candidate.assets[0].browser_download_url);
-  assert.equal(result.size, 123456);
-  candidate.assets[0].name = 'next-small-step-2.1.0.apk';
-  assert.throws(() => releaseInfo(candidate, '2.0.2'));
+test('already-current releases need no download and notes stay bounded', () => {
+  assert.equal(updateInfo({ version: '2.0.2' }, '2.0.3').status, 'current');
+  assert.equal(updateInfo({ ...release(), releaseNotes: 'x'.repeat(10000) }, '2.0.3').notes.length, 6000);
 });
-
-test('download URL cannot redirect the bridge to other origins, paths or protocols', () => {
-  const canonical = release().assets[0].browser_download_url;
-  const invalidUrls = [
-    canonical.replace('github.com', 'github.com.evil.example'),
-    canonical.replace('zyy051206', 'different-owner'),
-    canonical.replace('v2.1.0', 'v2.0.1'),
-    canonical.replace('https:', 'http:'), canonical + '?redirect=elsewhere',
-    'file:///C:/Windows/System32/calc.exe', 'javascript:alert(1)',
-    canonical.replace('github.com', 'evil@github.com')
-  ];
-  for (const url of invalidUrls) {
-    const candidate = release();
-    candidate.assets[0].browser_download_url = url;
-    assert.throws(() => releaseInfo(candidate, '2.0.2'));
-  }
+test('updates require explicit download and install; quit never auto-installs', () => {
+  const { updater } = fixture();
+  assert.equal(updater.autoDownload, false);
+  assert.equal(updater.autoInstallOnAppQuit, false);
+  assert.equal(updater.allowDowngrade, false);
+  assert.equal(updater.allowPrerelease, false);
+  assert.equal(updater.disableWebInstaller, true);
 });
-
-test('drafts, prereleases, missing status and incomplete files are not offered', () => {
-  for (const patch of [{ draft: true }, { prerelease: true }, { draft: undefined }, { assets: [] }, { tag_name: '2.1.0' }]) {
-    assert.throws(() => releaseInfo({ ...release(), ...patch }, '2.0.2'));
-  }
-  for (const patch of [{ state: 'new' }, { size: 0 }, { size: -1 }, { size: '123' }]) {
-    const candidate = release();
-    Object.assign(candidate.assets[0], patch);
-    assert.throws(() => releaseInfo(candidate, '2.0.2'));
-  }
+test('download and installation reject requests before a validated check', async () => {
+  const { service, installs } = fixture();
+  assert.equal((await service.download('download')).status, 'error');
+  assert.equal((await service.install('install')).status, 'error');
+  assert.equal(installs.length, 0);
 });
-
-test('current or older release does not offer a downgrade or require an asset', () => {
-  assert.equal(releaseInfo({ ...release('2.0.2'), assets: [] }, '2.0.2').status, 'current');
-  assert.equal(releaseInfo({ ...release('2.0.1'), assets: [] }, '2.0.2').status, 'current');
-});
-
-test('release notes are bounded and left as plain text for the frontend', () => {
-  const candidate = release();
-  candidate.body = '<script>alert(1)</script>' + 'x'.repeat(10000);
-  const result = releaseInfo(candidate, '2.0.2');
-  assert.equal(result.notes.length, 6000);
-  assert.ok(result.notes.startsWith('<script>'));
-});
-
-test('service only downloads a previously validated cached update', async () => {
-  const opened = [];
-  const updater = createUpdateService({ currentVersion: '2.0.2', loadRelease: async () => release(), openExternal: async url => opened.push(url) });
-  assert.equal((await updater.download()).status, 'error');
-  assert.equal(opened.length, 0);
-  const result = await updater.check();
-  assert.equal(result.status, 'available');
-  assert.equal('url' in result, false);
-  assert.equal((await updater.download('https://evil.example')).status, 'opened');
-  assert.deepEqual(opened, [release().assets[0].browser_download_url]);
-});
-
-test('a failed recheck clears a previously offered update and hides raw errors', async () => {
-  let fail = false;
-  const updater = createUpdateService({ currentVersion: '2.0.2', loadRelease: async () => {
-    if (fail) throw new Error('sensitive-network-details');
-    return release();
-  }, openExternal: async () => { throw new Error('must not open'); } });
-  await updater.check();
-  fail = true;
-  const result = await updater.check();
-  assert.equal(result.status, 'error');
-  assert.ok(!result.message.includes('sensitive'));
-  assert.equal((await updater.download()).status, 'error');
-});
-
-test('simultaneous checks share a single request and downloads prevent duplicate browser launches', async () => {
-  let completeCheck, completeOpen, calls = 0, opens = 0;
-  const updater = createUpdateService({ currentVersion: '2.0.2',
-    loadRelease: () => { calls++; return new Promise(resolve => { completeCheck = resolve; }); },
-    openExternal: () => { opens++; return new Promise(resolve => { completeOpen = resolve; }); } });
-  const first = updater.check();
-  const second = updater.check();
+test('check is deduplicated and raw errors are not exposed', async () => {
+  const { service, updater } = fixture();
+  let resolve, calls = 0;
+  updater.checkForUpdates = () => { calls++; return new Promise(done => { resolve = done; }); };
+  const first = service.check(), second = service.check();
   await Promise.resolve();
   assert.equal(calls, 1);
-  completeCheck(release());
-  await Promise.all([first, second]);
-  const opening = updater.download();
-  assert.equal((await updater.download()).status, 'error');
-  completeOpen();
-  assert.equal((await opening).status, 'opened');
-  assert.equal(opens, 1);
-});
-
-test('failure to open a system browser is reported safely and can be retried', async () => {
-  let fail = true;
-  const updater = createUpdateService({ currentVersion: '2.0.2', loadRelease: async () => release(), openExternal: async () => {
-    if (fail) throw new Error('private-path');
-  } });
-  await updater.check();
-  const result = await updater.download();
+  resolve({ updateInfo: release(), isUpdateAvailable: true });
+  assert.equal((await first).status, 'available'); await second;
+  updater.checkForUpdates = async () => { throw new Error('secret-host/path'); };
+  const result = await service.check();
   assert.equal(result.status, 'error');
-  assert.ok(!result.message.includes('private-path'));
-  fail = false;
-  assert.equal((await updater.download()).status, 'opened');
+  assert.ok(!result.message.includes('secret-host'));
 });
-
-test('HTTPS metadata fetch contacts only the fixed public endpoint without credentials', async () => {
-  const request = fakeRequest();
-  assert.deepEqual(await fetchLatestRelease({ get: request.get }), release());
-  assert.equal(request.url, LATEST_URL);
-  assert.equal(request.headers.Authorization, undefined);
-  assert.equal(request.headers['X-GitHub-Api-Version'], '2022-11-28');
+test('bounded checking closes updater connections on a stalled request', async () => {
+  const { service, updater } = fixture({ checkTimeoutMs: 10 });
+  let closed = false;
+  updater.netSession = { closeAllConnections: async () => { closed = true; } };
+  updater.checkForUpdates = () => new Promise(() => {});
+  assert.equal((await service.check()).status, 'error');
+  assert.equal(closed, true);
 });
-
-test('HTTP redirects and server errors are rejected without following locations', async () => {
-  for (const status of [301, 302, 403, 404, 429, 500]) {
-    const request = fakeRequest({ status, headers: { location: 'https://evil.example' } });
-    await assert.rejects(fetchLatestRelease({ get: request.get }));
-    assert.equal(request.calls, 1);
-    assert.equal(request.destroyed, true);
-  }
+test('download progress has its originating ID and ready state survives panel reopen', async () => {
+  const { service, updater, notifications } = fixture();
+  await service.check();
+  let complete;
+  const original = updater.downloadUpdate;
+  updater.downloadUpdate = () => new Promise(resolve => { complete = async () => resolve(await original()); });
+  const operation = service.download('dl1');
+  await Promise.resolve();
+  updater.emit('download-progress', { transferred: 10, total: data.length });
+  assert.equal(service.state().status, 'progress');
+  assert.equal(service.state().received, 10);
+  assert.equal(notifications.at(-1).requestId, 'dl1');
+  assert.equal(notifications.at(-1).action, 'download');
+  await complete();
+  assert.equal((await operation).status, 'ready');
+  assert.equal(service.state().percent, 100);
+  assert.equal((await service.check()).status, 'ready');
 });
-
-test('oversized, malformed, stalled and offline responses fail within bounds', async () => {
-  for (const options of [
-    { body: 'not-json' }, { body: 'x'.repeat(65) },
-    { headers: { 'content-length': '1000000' } }, { error: new Error('private-host-name') }
-  ]) {
-    const request = fakeRequest(options);
-    await assert.rejects(fetchLatestRelease({ get: request.get, maxBytes: 64 }), error => !error.message.includes('private-host-name'));
-    assert.equal(request.destroyed, true);
-  }
-  const stalled = fakeRequest({ stall: true });
-  await assert.rejects(fetchLatestRelease({ get: stalled.get, timeoutMs: 15 }), /超时/);
-  assert.equal(stalled.destroyed, true);
+test('cancellation is reflected immediately and another download can retry', async () => {
+  const { service, updater, file } = fixture();
+  await service.check();
+  updater.downloadUpdate = token => token.createPromise(() => {});
+  const pending = service.download('cancel');
+  await Promise.resolve();
+  assert.equal(service.cancel().status, 'cancelled');
+  assert.equal((await pending).status, 'cancelled');
+  updater.downloadUpdate = async () => [file];
+  assert.equal((await service.download('retry')).status, 'ready');
+});
+test('stalled downloads cancel within the native time limit', async () => {
+  const { service, updater } = fixture({ downloadTimeoutMs: 10 });
+  await service.check();
+  updater.downloadUpdate = token => token.createPromise(() => {});
+  const result = await service.download('timeout');
+  assert.equal(result.status, 'error');
+  assert.ok(result.message.includes('超时'));
+});
+test('bad downloaded bytes are never ready or installable', async () => {
+  const { service, file, installs } = fixture();
+  await service.check();
+  fs.writeFileSync(file, Buffer.alloc(data.length));
+  assert.equal((await service.download('bad')).status, 'error');
+  assert.equal((await service.install('install')).status, 'error');
+  assert.equal(installs.length, 0);
+});
+test('tampering after download is detected before installing', async () => {
+  const { service, file, installs } = fixture();
+  await service.check(); await service.download('good');
+  fs.writeFileSync(file, Buffer.alloc(data.length));
+  assert.equal((await service.install('tampered')).status, 'error');
+  assert.equal(installs.length, 0);
+});
+test('explicit install flushes data and invokes NSIS restart once after UI acknowledgement', async () => {
+  let flushed = false;
+  const { service, installs } = fixture({ beforeInstall: async () => { flushed = true; } });
+  await service.check(); await service.download('good');
+  const first = service.install('install');
+  const duplicate = service.install('install-again');
+  assert.equal((await first).status, 'installing');
+  assert.equal((await duplicate).status, 'installing');
+  assert.equal(flushed, true);
+  await sleep(15);
+  assert.deepEqual(installs, [[true, true]]);
+});
+test('failed installer startup restores ready state with safe retry feedback', async () => {
+  const { service, updater } = fixture();
+  await service.check(); await service.download('good');
+  updater.quitAndInstall = () => { throw new Error('private-executable-path'); };
+  await service.install('install');
+  await sleep(15);
+  assert.equal(service.state().status, 'ready');
+  assert.ok(!service.state().message.includes('private-executable-path'));
 });

@@ -1,6 +1,6 @@
 {
   "name": "next-small-step-desktop",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "private": true,
   "description": "下一小步：离线目标、日历待办与番茄专注桌面应用",
   "author": "zyy051206",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "make-icon": "electron make-icon.cjs",
-    "build:win": "npm run make-icon && electron-builder --win portable --x64 --publish never",
+    "build:win": "npm run make-icon && electron-builder --win nsis --x64 --publish never",
     "smoke": "node smoke.cjs",
     "test": "node --test updates.test.cjs"
   },
@@ -21,17 +21,49 @@
     "productName": "下一小步",
     "copyright": "Copyright © 2026 zyy051206",
     "asar": true,
-    "directories": { "output": "release" },
-    "files": ["main.cjs", "preload.cjs", "updates.cjs", "icon.ico", "package.json"],
-    "extraResources": [{ "from": "../dist", "to": "web", "filter": ["**/*"] }],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "updates.cjs",
+      "update-smoke.cjs",
+      "icon.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "web",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "icon.ico",
       "executableName": "NextSmallStep"
     },
-    "portable": {
-      "requestExecutionLevel": "user",
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
       "artifactName": "next-small-step-${version}-windows-${arch}.exe"
-    }
+    },
+    "publish": [{ "provider": "github", "owner": "zyy051206", "repo": "next-small-step", "releaseType": "release" }]
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   }
 }
