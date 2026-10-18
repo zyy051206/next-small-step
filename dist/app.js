@@ -94,7 +94,7 @@
     document.querySelectorAll('[data-minutes]').forEach(el => { el.disabled = !!t || !isFocus; el.setAttribute('aria-pressed', String(Number(el.dataset.minutes) === (t && isFocus ? t.duration / 60000 : state.minutes))); });
     document.querySelectorAll('[data-focus-mode]').forEach(el => { el.disabled = !!t; el.setAttribute('aria-pressed', String(el.dataset.focusMode === mode)); });
     if ($('focus-settings-open')) $('focus-settings-open').disabled = !!t;
-    if ($('pomodoro-progress')) $('pomodoro-progress').textContent = `已完成 ${state.pomodoroCount} 个番茄 · 本轮 ${state.pomodoroCount % state.preferences.cycles} / ${state.preferences.cycles}`;
+    if ($('pomodoro-progress')) $('pomodoro-progress').textContent = `累计完成 ${state.pomodoroCount} 次专注 · 每轮 ${state.preferences.cycles} 次`;
     document.title = t ? `${$('timer-readout').textContent} · ${t.status === 'running' ? (isFocus ? '专注中' : '休息中') : '已暂停'} · 下一小步` : '下一小步 · 让想法慢慢发生';
     window.StepPages?.updateTimer();
   }
