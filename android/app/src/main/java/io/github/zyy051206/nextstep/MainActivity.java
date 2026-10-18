@@ -112,7 +112,11 @@ public final class MainActivity extends Activity {
                 pageReady = isLocalPage(Uri.parse(url));
                 if (pageReady && pendingResult != null) dispatchBackupResult();
                 if (pageReady && pendingUpdateResult != null) dispatchUpdateResult();
-                if (pageReady) dispatchWidgetCommand();
+                if (pageReady) {
+                    // Four utility controls share the phone header; use labelled icons so large fonts still fit.
+                    webView.evaluateJavascript("(function(){if(document.getElementById('android-widget-header'))return;var s=document.createElement('style');s.id='android-widget-header';s.textContent=\"@media(max-width:700px){#widgets-open{font-size:0;width:28px;min-height:32px;flex-shrink:0}#widgets-open:before{content:'▦';font-size:22px}#appearance-open>span{display:none}.sidebar-bottom #guide-open{font-size:0}.sidebar-bottom #guide-open>span{font-size:11px}.sidebar-bottom{gap:6px!important}}\";document.head.append(s);[['widgets-open','桌面组件'],['guide-open','使用指南'],['appearance-open','外观']].forEach(function(p){var b=document.getElementById(p[0]);if(b){b.setAttribute('aria-label',p[1]);b.title=p[1]}})})()",null);
+                    dispatchWidgetCommand();
+                }
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
