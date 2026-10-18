@@ -278,6 +278,7 @@
   $('appearance-font').addEventListener('input', e => updatePreferences({ fontScale: Number(e.target.value) }));
   async function snapshot() {
     await ready; await backgroundQueue;
+    if(preferenceReadError) throw Error('外观设置损坏，请先修复或恢复默认设置。');
     const image = await imageTransaction('readonly', store => store.get('background'));
     return { preferences: { ...prefs }, image: image || null };
   }

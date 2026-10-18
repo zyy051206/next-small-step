@@ -83,14 +83,15 @@ function createUpdateService({ currentVersion, updater, notify = () => {}, befor
       if (checking) return checking;
       expected = null;
       installer = null;
-      let timeout;
+      let timeout, expired = false;
       checking = Promise.race([
         Promise.resolve().then(() => updater.checkForUpdates()).catch(async error => {
-          if (typeof updater.setFeedURL !== 'function') throw error;
+          if (expired || typeof updater.setFeedURL !== 'function') throw error;
           updater.setFeedURL({ provider:'generic', url:'https://github.com/zyy051206/next-small-step/releases/latest/download/', useMultipleRangeRequest:false });
           return updater.checkForUpdates();
         }),
         new Promise((_, reject) => { timeout = setTimeout(() => {
+          expired = true;
           updater.netSession?.closeAllConnections().catch(() => {});
           reject(new Error('timeout'));
         }, checkTimeoutMs); })

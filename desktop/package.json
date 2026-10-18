@@ -10,7 +10,7 @@
     "make-icon": "electron make-icon.cjs",
     "build:win": "npm run make-icon && electron-builder --win nsis --x64 --publish never",
     "smoke": "node smoke.cjs",
-    "test": "node --test updates.test.cjs"
+    "test": "node --test updates.test.cjs reminders.test.cjs"
   },
   "devDependencies": {
     "electron": "44.9.0",

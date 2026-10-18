@@ -24,7 +24,7 @@ const server = createServer((req, res) => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${server.address().port}/`;
   const browser = spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19363',
+    '--headless=new', '--disable-extensions', '--disable-gpu', '--no-first-run', '--remote-debugging-port=19363',
     '--user-data-dir=' + path.join(qa, 'updates-browser-' + Date.now()), 'about:blank'
   ], { windowsHide: true, stdio: 'ignore' });
   let ws, count = 0;
@@ -36,7 +36,7 @@ const server = createServer((req, res) => {
       catch { await delay(250); }
     }
     if (!tabs) throw Error('Headless Edge unavailable');
-    ws = new WebSocket(tabs.find(tab => tab.type === 'page').webSocketDebuggerUrl);
+    ws = new WebSocket(tabs.find(tab => tab.type === 'page' && tab.url === 'about:blank').webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
     let id = 0;
     const pending = new Map();
@@ -225,6 +225,10 @@ const server = createServer((req, res) => {
     assert(!(await ev(visible('#updates-download'))) || await ev("document.querySelector('#updates-download').disabled"), 'already-current result cannot download an old build');
     await click('#updates-check'); await reply('error', { message: '网络暂时不可用，请稍后重试。' }, 'check');
     assert(/网络|重试|失败/.test(await statusText()) && await ev("!document.querySelector('#updates-check').disabled"), 'offline error remains recoverable through retry');
+    const beforeRetry=await ev(`${callsFor('check')}.length`);
+    await click('#updates-check');
+    assert(await ev(`${callsFor('check')}.length`)===beforeRetry, 'failed checks respect a cooldown instead of repeatedly contacting the service');
+    await ev("window.originalNow=Date.now;Date.now=()=>originalNow()+61000");
     await click('#updates-check'); await reply('available', { version: '2.0.4', notes, size: 109664568 }, 'check');
     assert(await ev("!document.querySelector('#updates-download').disabled"), 'retry can recover from network failure and offer the new version');
     for (const width of [1440, 390, 320]) {

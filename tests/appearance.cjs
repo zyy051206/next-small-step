@@ -199,6 +199,7 @@ const server = createServer((req, res) => {
     await ev("localStorage.setItem('next-small-step.appearance.v1','{broken appearance preferences')");
     await reload(); await open();
     assert(await ev("document.querySelector('#appearance-status').dataset.tone==='error' && localStorage.getItem('next-small-step.appearance.v1')==='{broken appearance preferences'"), 'unreadable appearance settings show a warning and preserve the original stored value');
+    assert(await ev("StepBackup.create(StepApp.getState()).then(()=>false,()=>true)"), 'corrupt appearance settings prevent a misleading complete backup');
     await click('#appearance-color-reset');
     assert(await ev("JSON.parse(localStorage.getItem('next-small-step.appearance.v1')).iconColor==='#315b46' && document.querySelector('#appearance-status').dataset.tone!=='error'"), 'explicit reset recovers from unreadable appearance settings');
     await close(); await reload();
