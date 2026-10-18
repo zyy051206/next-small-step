@@ -10,13 +10,13 @@
 
 ## 打开
 
-在 [v2.0.0 发布页](https://github.com/zyy051206/next-small-step/releases/tag/v2.0.0) 选择：
+在 [v2.0.1 发布页](https://github.com/zyy051206/next-small-step/releases/tag/v2.0.1) 选择：
 
 | 平台 | 下载与运行 |
 | --- | --- |
-| Windows 10/11 x64 | `next-small-step-2.0.0-windows-x64.exe`，双击运行 |
-| Android 8.0 及以上 | `next-small-step-2.0.0.apk`，传到手机安装 |
-| 电脑/手机浏览器 | 在线网页；或下载网页 ZIP，在电脑解压后打开 `index.html` |
+| Windows 10/11 x64 | [下载 2.0.1 EXE](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-2.0.1-windows-x64.exe)，关闭旧程序后双击运行 |
+| Android 8.0 及以上 | [下载 2.0.1 APK](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-2.0.1.apk)，传到手机覆盖安装 |
+| 电脑/手机浏览器 | 在线网页；或[下载网页 ZIP](https://github.com/zyy051206/next-small-step/releases/download/v2.0.1/next-small-step-browser-2.0.1.zip)，在电脑解压后打开 `index.html` |
 
 EXE 未做 Windows 数字签名，系统可能显示未知发布者；发布页提供 SHA-256 校验值。iPhone 使用网页版。
 
@@ -50,7 +50,7 @@ node serve.cjs
 
 ## 安卓安装与迁移
 
-在 [Releases](https://github.com/zyy051206/next-small-step/releases) 下载 `next-small-step-2.0.0.apk`，传到安卓手机并打开安装。支持 Android 8.0 及以上，建议使用更新后的 Android System WebView。手机可能要求允许此次来源安装应用。新版沿用正式版签名，可覆盖安装 v1.1.0；升级前建议导出备份。
+在 [Releases](https://github.com/zyy051206/next-small-step/releases) 下载 `next-small-step-2.0.1.apk`，传到安卓手机并打开安装。支持 Android 8.0 及以上，建议使用更新后的 Android System WebView。手机可能要求允许此次来源安装应用。新版沿用正式版签名，可覆盖安装 v1.1.0 / v2.0.0；升级前建议导出备份。
 
 电脑已有进度：先在原网页点“导出备份”，把 JSON 文件传到手机，再在 App 中点“导入备份”。导入会在确认后替换目标设备的现有数据，不会自动合并。卸载 App 会清除其本地数据，请先备份。iPhone 可使用网页版本，不能安装 APK。
 
