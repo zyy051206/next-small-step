@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../dist/core.js');
-function fixture() { const d = C.initial(); d.goals.push({ id: 'g', title: '毕业作品', why: '', createdAt: Date.now(), steps: [{ id: 's', text: '画一张草图', done: false, completedAt: null, dueDate: null, priority: 'normal' }] }); return d; }
-function legacyFixture() { const d = fixture(); d.version = 1; for (const field of ['dates', 'preferences', 'pomodoroCount', 'mode']) delete d[field]; for (const step of d.goals[0].steps) { delete step.dueDate; delete step.priority; } return d; }
+function fixture() { const d = C.initial(); d.goals.push({ id: 'g', title: '毕业作品', why: '', createdAt: Date.now(), steps: [{ id: 's', text: '画一张草图', done: false, completedAt: null, dueDate: null, priority: 'normal', estimate: 0, pomodoros: 0 }] }); return d; }
+function legacyFixture() { const d = fixture(); d.version = 1; for (const field of ['dates', 'preferences', 'pomodoroCount', 'mode']) delete d[field]; for (const step of d.goals[0].steps) { delete step.dueDate; delete step.priority; delete step.estimate; delete step.pomodoros; } return d; }
 test('empty backup and fallback selections round-trip', () => { assert.deepEqual(C.validate(C.initial()), C.initial()); assert.equal(C.validate(fixture()).selectedStep, 's'); });
 test('reject damaged backups, duplicate IDs and excessive text without altering input', () => { const d = fixture(); d.goals[0].steps.push({ ...d.goals[0].steps[0] }); assert.throws(() => C.validate(d)); assert.equal(d.goals[0].steps.length, 2); assert.throws(() => C.validate({ version: 2, goals: [], sessions: [] })); const long = fixture(); long.goals[0].title = 'x'.repeat(101); assert.throws(() => C.validate(long)); });
 test('running timers use wall clock, paused timers do not', () => { assert.equal(C.remaining({ status: 'running', endsAt: 10000 }, 3500), 6500); assert.equal(C.remaining({ status: 'running', endsAt: 10000 }, 11000), 0); assert.equal(C.remaining({ status: 'paused', remaining: 1234 }, 99999), 1234); });
@@ -45,7 +45,8 @@ test('old version-one backups retain all historical sessions for annual statisti
   const data = legacyFixture();
   data.sessions = [2023, 2024, 2025, 2026].map(year => ({ ...sessionAt(year, 6, 1, 600), id: `history-${year}`, goalTitle: '历史目标', stepTitle: '历史行动' }));
   const restored = C.validate(JSON.parse(JSON.stringify(data)));
-  assert.equal(restored.version, 2); assert.deepEqual(restored.sessions, data.sessions);
+  assert.equal(restored.version, 3);
+  assert.deepEqual(restored.sessions, data.sessions.map(session => ({ ...session, stepId: null, completed: false })));
   assert.equal(C.annual(restored.sessions, 2023).seconds, 600);
   assert.equal(C.annual([], 2026).seconds, 0); assert.equal(C.annual([], 2026).months.length, 12);
 });
@@ -55,19 +56,33 @@ test('version-one migration preserves goal IDs, task status, selection and an ac
   data.timer = { goalId: 'g', stepId: 's', status: 'paused', duration: 2700000, remaining: 1200000, endsAt: Date.now() };
   const original = JSON.stringify(data), migrated = C.validate(data);
   assert.equal(JSON.stringify(data), original);
-  assert.equal(C.key, 'next-small-step.v1'); assert.equal(migrated.version, 2); assert.equal(migrated.minutes, 45);
+  assert.equal(C.key, 'next-small-step.v1'); assert.equal(migrated.version, 3); assert.equal(migrated.minutes, 45);
   assert.deepEqual(migrated.timer, { kind: 'focus', ...data.timer });
   assert.equal(migrated.goals[0].steps[0].dueDate, null); assert.equal(migrated.goals[0].steps[0].priority, 'normal');
-  assert.deepEqual(migrated.preferences, { shortBreak: 5, longBreak: 15, cycles: 4 });
+  assert.equal(migrated.goals[0].steps[0].estimate, 0); assert.equal(migrated.goals[0].steps[0].pomodoros, 0);
+  assert.deepEqual(migrated.preferences, { shortBreak: 5, longBreak: 15, cycles: 4, dailyGoal: 4, sound: 'off', volume: 35 });
   assert.deepEqual(migrated.dates, []); assert.equal(migrated.pomodoroCount, 0); assert.equal(migrated.mode, 'focus');
 });
 
-test('version-two backup round-trips scheduled tasks, important dates and custom pomodoro settings', () => {
-  const data = fixture(); data.selectedGoal = 'g'; data.selectedStep = 's'; data.minutes = 90;
+test('version-two backup migrates scheduled tasks and adds safe pomodoro defaults', () => {
+  const data = fixture(); data.version = 2; data.selectedGoal = 'g'; data.selectedStep = 's'; data.minutes = 90;
   Object.assign(data.goals[0].steps[0], { dueDate: '2028-02-29', priority: 'high' });
+  delete data.goals[0].steps[0].estimate; delete data.goals[0].steps[0].pomodoros;
   data.dates = [{ id: 'event', title: '作品提交', date: '2028-02-29', category: '学习', repeat: 'yearly', pinned: true }];
   data.preferences = { shortBreak: 7, longBreak: 30, cycles: 6 }; data.pomodoroCount = 12; data.mode = 'longBreak';
   data.timer = { kind: 'longBreak', goalId: null, stepId: null, status: 'paused', duration: 1800000, remaining: 780000, endsAt: Date.now() };
+  const migrated = C.validate(JSON.parse(JSON.stringify(data)));
+  assert.equal(migrated.version, 3);
+  assert.deepEqual(migrated.preferences, { shortBreak: 7, longBreak: 30, cycles: 6, dailyGoal: 4, sound: 'off', volume: 35 });
+  assert.deepEqual(migrated.goals[0].steps[0], { id: 's', text: '画一张草图', done: false, completedAt: null, dueDate: '2028-02-29', priority: 'high', estimate: 0, pomodoros: 0 });
+  assert.equal(migrated.dates[0].id, 'event'); assert.equal(migrated.minutes, 90); assert.equal(migrated.pomodoroCount, 12);
+});
+
+test('version-three backup round-trips tomato estimates, daily goal, soundscape and session provenance', () => {
+  const data = fixture(); data.selectedGoal = 'g'; data.selectedStep = 's';
+  Object.assign(data.goals[0].steps[0], { estimate: 4, pomodoros: 2, dueDate: '2028-02-29', priority: 'high' });
+  data.preferences = { shortBreak: 7, longBreak: 30, cycles: 6, dailyGoal: 6, sound: 'rain', volume: 60 };
+  data.sessions = [{ id: 'session', goalTitle: '毕业作品', stepTitle: '画一张草图', finishedAt: Date.now(), seconds: 1500, stepId: 's', completed: true }];
   assert.deepEqual(C.validate(JSON.parse(JSON.stringify(data))), data);
 });
 
@@ -77,6 +92,11 @@ test('reject malformed scheduling fields and out-of-range settings without chang
     d => { delete d.goals[0].steps[0].dueDate; }, d => { d.minutes = 4; }, d => { d.minutes = 181; }, d => { d.minutes = 5.5; },
     d => { d.preferences.shortBreak = 0; }, d => { d.preferences.longBreak = 61; }, d => { d.preferences.cycles = 1; },
     d => { d.pomodoroCount = -1; }, d => { d.pomodoroCount = 2.5; }, d => { d.mode = 'automatic'; },
+    d => { d.goals[0].steps[0].estimate = -1; }, d => { d.goals[0].steps[0].estimate = 13; }, d => { d.goals[0].steps[0].estimate = 1.5; },
+    d => { delete d.goals[0].steps[0].estimate; }, d => { d.goals[0].steps[0].pomodoros = -1; },
+    d => { d.preferences.dailyGoal = 0; }, d => { d.preferences.dailyGoal = 25; }, d => { d.preferences.sound = 'music'; }, d => { d.preferences.volume = 101; },
+    d => { d.sessions = [{ id: 'x', goalTitle: '目标', stepTitle: '行动', finishedAt: Date.now(), seconds: 60, stepId: null, completed: 'yes' }]; },
+    d => { d.sessions = [{ id: 'x', goalTitle: '目标', stepTitle: '行动', finishedAt: Date.now(), seconds: 60, stepId: 42, completed: true }]; },
     d => { d.dates = [{ id: 's', title: '重复 ID', date: '2026-12-01', category: '', repeat: 'none', pinned: false }]; },
     d => { d.dates = [{ id: 'e', title: '事件', date: '2026-13-01', category: '', repeat: 'none', pinned: false }]; },
     d => { d.dates = [{ id: 'e', title: '事件', date: '2026-12-01', category: 'x'.repeat(33), repeat: 'none', pinned: false }]; },
@@ -125,6 +145,7 @@ test('a full focus interval records one session then suggests a break without st
   assert.deepEqual(C.settleTimer(data, 10000000), { kind: 'focus', seconds: 1500, completed: true });
   assert.equal(data.sessions.length, 1); assert.equal(data.sessions[0].finishedAt, 10000000);
   assert.equal(data.pomodoroCount, 1); assert.equal(data.mode, 'shortBreak'); assert.equal(data.timer, null);
+  assert.equal(data.goals[0].steps[0].pomodoros, 1); assert.equal(data.sessions[0].stepId, 's'); assert.equal(data.sessions[0].completed, true);
   assert.equal(C.settleTimer(data, 20000000), null); assert.equal(data.sessions.length, 1);
   data.pomodoroCount = 3; activeTimer(data); C.settleTimer(data, 10000000);
   assert.equal(data.pomodoroCount, 4); assert.equal(data.mode, 'longBreak'); assert.equal(data.timer, null);
@@ -133,6 +154,7 @@ test('a full focus interval records one session then suggests a break without st
 test('breaks never enter focus statistics and partial completion does not increment pomodoros', () => {
   const data = fixture(); activeTimer(data, 'focus'); C.settleTimer(data, 9500000);
   assert.equal(data.sessions[0].seconds, 1000); assert.equal(data.pomodoroCount, 0); assert.equal(data.mode, 'focus');
+  assert.equal(data.goals[0].steps[0].pomodoros, 0); assert.equal(data.sessions[0].completed, false);
   activeTimer(data, 'shortBreak', 300000); C.settleTimer(data, 10000000);
   assert.equal(data.sessions.length, 1); assert.equal(data.pomodoroCount, 0); assert.equal(data.mode, 'focus'); assert.equal(data.timer, null);
   activeTimer(data, 'focus', 10800000); C.settleTimer(data, 10000000);
@@ -149,7 +171,7 @@ test('returning after a long absence settles only the original interval at its o
 
 test('accepted long-term history remains readable after another focus session without truncation', () => {
   const data = fixture();
-  data.sessions = Array.from({ length: 50000 }, (_, i) => ({ id: `history-${i}`, goalTitle: '历史目标', stepTitle: '历史行动', finishedAt: 1000000 + i, seconds: 60 }));
+  data.sessions = Array.from({ length: 50000 }, (_, i) => ({ id: `history-${i}`, goalTitle: '历史目标', stepTitle: '历史行动', finishedAt: 1000000 + i, seconds: 60, stepId: null, completed: false }));
   const restored = C.validate(JSON.parse(JSON.stringify(data)));
   activeTimer(restored);
   C.settleTimer(restored, 10000000);
@@ -160,4 +182,12 @@ test('accepted long-term history remains readable after another focus session wi
   assert.equal(reloaded.sessions[50000].finishedAt, 10000000);
   assert.equal(reloaded.pomodoroCount, 1);
   assert.equal(reloaded.timer, null);
+});
+
+test('today tomatoes count only completed focus intervals on the local calendar day', () => {
+  const now = new Date(2026, 9, 21, 15, 0).getTime();
+  const at = (day, hour, completed, seconds = 1500) => ({ id: `t-${day}-${hour}-${completed}`, goalTitle: '目标', stepTitle: '行动', finishedAt: new Date(2026, 9, day, hour).getTime(), seconds, stepId: 's', completed });
+  const sessions = [at(21, 9, true), at(21, 11, true), at(21, 13, false, 600), at(20, 23, true), at(22, 0, true)];
+  assert.equal(C.todayTomatoes(sessions, now), 2);
+  assert.equal(C.todayTomatoes([], now), 0);
 });

@@ -1,9 +1,11 @@
 (function (root) {
   'use strict';
-  const VERSION = 2;
+  const VERSION = 3;
+  const SOUNDS = ['off', 'rain', 'breeze', 'white'];
   const key = 'next-small-step.v1';
   const id = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const initial = () => ({ version: VERSION, goals: [], sessions: [], selectedGoal: null, selectedStep: null, minutes: 25, timer: null, dates: [], preferences: { shortBreak: 5, longBreak: 15, cycles: 4 }, pomodoroCount: 0, mode: 'focus' });
+  const defaultPreferences = () => ({ shortBreak: 5, longBreak: 15, cycles: 4, dailyGoal: 4, sound: 'off', volume: 35 });
+  const initial = () => ({ version: VERSION, goals: [], sessions: [], selectedGoal: null, selectedStep: null, minutes: 25, timer: null, dates: [], preferences: defaultPreferences(), pomodoroCount: 0, mode: 'focus' });
   function dayKey(time) { const d = new Date(time); return `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
   function dateNumber(date) {
     const [year, month, day] = date.split('-').map(Number), result = new Date(0);
@@ -34,12 +36,16 @@
     const finite = v => typeof v === 'number' && Number.isFinite(v);
     const timestamp = v => finite(v) && Math.abs(v) <= 8640000000000000;
     const whole = (v, min, max) => Number.isSafeInteger(v) && v >= min && v <= max;
-    if (!data || ![1, VERSION].includes(data.version) || !Array.isArray(data.goals) || !Array.isArray(data.sessions) || data.goals.length > 100) fail();
-    const legacy = data.version === 1;
-    let dates = [], preferences = { shortBreak: 5, longBreak: 15, cycles: 4 }, pomodoroCount = 0, mode = 'focus';
+    if (!data || ![1, 2, VERSION].includes(data.version) || !Array.isArray(data.goals) || !Array.isArray(data.sessions) || data.goals.length > 100) fail();
+    const legacy = data.version === 1, current = data.version === VERSION;
+    let dates = [], preferences = defaultPreferences(), pomodoroCount = 0, mode = 'focus';
     if (!legacy) {
       if (!Array.isArray(data.dates) || data.dates.length > 200 || !data.preferences || !whole(data.preferences.shortBreak, 1, 60) || !whole(data.preferences.longBreak, 1, 60) || !whole(data.preferences.cycles, 2, 8) || !whole(data.pomodoroCount, 0, Number.MAX_SAFE_INTEGER) || !['focus', 'shortBreak', 'longBreak'].includes(data.mode) || !whole(data.minutes, 5, 180)) fail();
-      preferences = { shortBreak: data.preferences.shortBreak, longBreak: data.preferences.longBreak, cycles: data.preferences.cycles };
+      preferences = { shortBreak: data.preferences.shortBreak, longBreak: data.preferences.longBreak, cycles: data.preferences.cycles, dailyGoal: 4, sound: 'off', volume: 35 };
+      if (current) {
+        if (!whole(data.preferences.dailyGoal, 1, 24) || !SOUNDS.includes(data.preferences.sound) || !whole(data.preferences.volume, 0, 100)) fail();
+        preferences = { ...preferences, dailyGoal: data.preferences.dailyGoal, sound: data.preferences.sound, volume: data.preferences.volume };
+      }
       pomodoroCount = data.pomodoroCount; mode = data.mode;
     }
     const ids = new Set();
@@ -49,13 +55,17 @@
       unique(g.id);
       const steps = g.steps.map(s => {
         if (!s || !string(s.text, 160) || !s.text.trim() || typeof s.done !== 'boolean' || !(s.completedAt === null || timestamp(s.completedAt)) || (!legacy && (!(s.dueDate === null || validDate(s.dueDate)) || !['low', 'normal', 'high'].includes(s.priority)))) fail();
-        unique(s.id); return { id: s.id, text: s.text, done: s.done, completedAt: s.completedAt, dueDate: legacy ? null : s.dueDate, priority: legacy ? 'normal' : s.priority };
+        if (current && (!whole(s.estimate, 0, 12) || !whole(s.pomodoros, 0, 100000))) fail();
+        unique(s.id);
+        return { id: s.id, text: s.text, done: s.done, completedAt: s.completedAt, dueDate: legacy ? null : s.dueDate, priority: legacy ? 'normal' : s.priority, estimate: current ? s.estimate : 0, pomodoros: current ? s.pomodoros : 0 };
       });
       return { id: g.id, title: g.title, why: g.why, steps, createdAt: g.createdAt };
     });
     const sessions = data.sessions.map(s => {
       if (!s || !string(s.id, 120) || !string(s.goalTitle, 100) || !string(s.stepTitle, 160) || !timestamp(s.finishedAt) || !finite(s.seconds) || s.seconds < 0 || s.seconds > 10800) fail();
-      unique(s.id); return { id: s.id, goalTitle: s.goalTitle, stepTitle: s.stepTitle, finishedAt: s.finishedAt, seconds: s.seconds };
+      if (current && (!(s.stepId === null || string(s.stepId, 120)) || typeof s.completed !== 'boolean')) fail();
+      unique(s.id);
+      return { id: s.id, goalTitle: s.goalTitle, stepTitle: s.stepTitle, finishedAt: s.finishedAt, seconds: s.seconds, stepId: current ? s.stepId : null, completed: current ? s.completed : false };
     });
     if (!legacy) dates = data.dates.map(event => {
       if (!event || !string(event.title, 100) || !event.title.trim() || !validDate(event.date) || !string(event.category, 32) || !['none', 'yearly'].includes(event.repeat) || typeof event.pinned !== 'boolean') fail();
@@ -79,11 +89,18 @@
     const remainingMs = remaining(timer, finishedAt), seconds = Math.max(0, Math.floor((timer.duration - remainingMs) / 1000)), completed = remainingMs === 0;
     if (timer.kind === 'focus') {
       const goal = state.goals.find(g => g.id === timer.goalId), step = goal?.steps.find(s => s.id === timer.stepId);
-      if (goal && step && seconds > 0) state.sessions.push({ id: id(), goalTitle: goal.title, stepTitle: step.text, seconds, finishedAt: completed && timer.status === 'running' ? timer.endsAt : finishedAt });
+      if (goal && step && seconds > 0) {
+        state.sessions.push({ id: id(), goalTitle: goal.title, stepTitle: step.text, seconds, finishedAt: completed && timer.status === 'running' ? timer.endsAt : finishedAt, stepId: timer.stepId, completed });
+        if (completed) step.pomodoros = (step.pomodoros || 0) + 1;
+      }
       if (completed) { state.pomodoroCount += 1; state.mode = state.pomodoroCount % state.preferences.cycles === 0 ? 'longBreak' : 'shortBreak'; }
     } else state.mode = 'focus';
     state.timer = null;
     return { kind: timer.kind, seconds, completed };
+  }
+  function todayTomatoes(sessions, now = Date.now()) {
+    const today = dayKey(now);
+    return sessions.reduce((count, session) => count + (session.completed && dayKey(session.finishedAt) === today ? 1 : 0), 0);
   }
   function week(sessions, now = Date.now()) {
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - 6 + i); const key = dayKey(d); return { key, date: d, seconds: sessions.filter(s => dayKey(s.finishedAt) === key).reduce((sum, s) => sum + s.seconds, 0) }; });
@@ -111,6 +128,6 @@
     }
     return [...years].sort((a, b) => a - b);
   }
-  const api = { key, initial, id, remaining, validate, dayKey, validDate, dateDelta, occurrence, settleTimer, week, annual, focusYears };
+  const api = { key, initial, id, remaining, validate, dayKey, validDate, dateDelta, occurrence, settleTimer, week, annual, focusYears, todayTomatoes, SOUNDS, defaultPreferences };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.StepCore = api;
 })(globalThis);

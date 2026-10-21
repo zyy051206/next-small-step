@@ -30,7 +30,7 @@
     state.selectedGoal = goalId; state.selectedStep = stepId; state.mode = 'focus'; save(); render();
     return true;
   }
-  const newStep = (value, dueDate = null, priority = 'normal') => ({ id: C.id(), text: value, done: false, completedAt: null, dueDate, priority });
+  const newStep = (value, dueDate = null, priority = 'normal', estimate = 0) => ({ id: C.id(), text: value, done: false, completedAt: null, dueDate, priority, estimate, pomodoros: 0 });
   function renderGoals() {
     $('goal-count').textContent = `${state.goals.length} 个目标`;
     $('goal-list').replaceChildren();
@@ -76,10 +76,66 @@
         meta.append(text('span', !s.done && delta < 0 ? `已逾期 · ${label}` : label, `step-date${!s.done && delta < 0 ? ' overdue' : ''}`));
       }
       if (s.priority !== 'normal') meta.append(text('span', s.priority === 'high' ? '优先处理' : '稍后再做', `priority priority-${s.priority}`));
+      if (s.estimate || s.pomodoros) meta.append(text('span', s.estimate ? `番茄 ${s.pomodoros} / ${s.estimate}` : `番茄 ${s.pomodoros}`, 'step-tomato'));
       content.append(choose); if (meta.childNodes.length) content.append(meta);
       const edit = button('编辑', 'step-edit', () => editTask(g.id, s.id), `编辑行动：${s.text}`);
       const remove = button('×', 'step-delete', () => { if (state.timer?.stepId === s.id) { toast('请先完成或重置这一步的专注。'); return; } confirmAction('移除这一步？', s.text, () => { g.steps = g.steps.filter(x => x.id !== s.id); if (state.selectedStep === s.id) selectFirst(); save(); render(); }); }, `删除行动：${s.text}`);
       item.append(check, content, edit, remove); $('step-list').append(item);
+    }
+  }
+  const priorityRank = { high: 0, normal: 1, low: 2 };
+  function todayRows() {
+    const today = C.dayKey(Date.now());
+    return state.goals.flatMap(goal => goal.steps.map(step => ({ goal, step })))
+      .filter(({ step }) => step.dueDate && (step.dueDate === today || (!step.done && step.dueDate < today)))
+      .sort((a, b) => Number(a.step.done) - Number(b.step.done)
+        || (priorityRank[a.step.priority] ?? 1) - (priorityRank[b.step.priority] ?? 1)
+        || a.step.dueDate.localeCompare(b.step.dueDate));
+  }
+  function renderToday() {
+    const today = C.dayKey(Date.now()), rows = todayRows(), done = rows.filter(row => row.step.done).length;
+    $('today-add').hidden = rows.length === 0;
+    const tomatoes = C.todayTomatoes(state.sessions), dailyGoal = state.preferences.dailyGoal;
+    $('today-count').textContent = rows.length ? `${rows.length} 项 · 已完成 ${done} 项` : '今天的清单还是空白';
+    $('today-goal-label').textContent = `今日番茄 ${tomatoes} / ${dailyGoal}`;
+    $('today-goal-dots').replaceChildren(...Array.from({ length: dailyGoal }, (_, i) => {
+      const dot = document.createElement('i'); if (i < tomatoes) dot.className = 'on'; return dot;
+    }));
+    $('today-list').replaceChildren();
+    if (!rows.length) {
+      const empty = text('div', '', 'today-empty');
+      const mark = text('span', '', 'today-empty-mark'); mark.setAttribute('aria-hidden', 'true');
+      mark.innerHTML = '<svg viewBox="0 0 40 40" fill="none"><circle cx="20" cy="23" r="12" stroke="currentColor" stroke-width="1.5"/><path d="M20 11c-1-5 3-7 7-7 0 5-3 7-7 7Zm0 0c-3-3-7-3-10-1 2 3 6 4 10 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+      const copy = text('div', '', 'today-empty-copy');
+      copy.append(text('strong', '今天还没有安排待办'), text('p', '把一件想在今天完成的小事放进来，然后从一个番茄开始。'));
+      empty.append(mark, copy, button('安排今日待办 ↗', 'today-empty-action', () => addTask(today)));
+      $('today-list').append(empty); return;
+    }
+    for (const { goal, step } of rows) {
+      const active = state.selectedGoal === goal.id && state.selectedStep === step.id;
+      const row = text('div', '', `today-task${step.done ? ' done' : ''}${active ? ' active' : ''}`);
+      const check = button(step.done ? '✓' : '', 'today-check', () => completeStep(goal, step), `${step.done ? '撤销完成' : '完成待办'}：${step.text}`);
+      check.setAttribute('aria-pressed', String(step.done));
+      const content = text('div', '', 'today-content');
+      const title = button(step.text, 'today-title', () => {
+        if (step.done) return;
+        if (selectTask(goal.id, step.id)) { setTimeout(() => $('timer-start').focus({ preventScroll: true }), 0); }
+      }, step.done ? `${step.text}，已完成` : `选择专注任务：${step.text}`);
+      title.disabled = step.done;
+      const meta = text('div', '', 'today-meta');
+      meta.append(text('span', goal.title));
+      if (!step.done && step.dueDate < today) meta.append(text('span', `已逾期 ${-C.dateDelta(step.dueDate)} 天`, 'overdue'));
+      if (step.priority !== 'normal') meta.append(text('span', step.priority === 'high' ? '优先处理' : '稍后再做', `priority-${step.priority}`));
+      content.append(title, meta);
+      const tomato = text('span', step.estimate ? `${step.pomodoros} / ${step.estimate}` : `${step.pomodoros}`, 'today-tomato');
+      tomato.setAttribute('aria-label', step.estimate ? `已完成 ${step.pomodoros} 个番茄，预计 ${step.estimate} 个` : `已完成 ${step.pomodoros} 个番茄`);
+      const focus = button('专注', 'today-focus', () => {
+        if (!selectTask(goal.id, step.id)) return;
+        $('timer-start').focus({ preventScroll: true });
+        $('timer-start').scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, `专注：${step.text}`);
+      row.append(check, content, tomato); if (!step.done) row.append(focus);
+      $('today-list').append(row);
     }
   }
   function drawTimer() {
@@ -95,13 +151,15 @@
     document.querySelectorAll('[data-minutes]').forEach(el => { el.disabled = !!t || !isFocus; el.setAttribute('aria-pressed', String(Number(el.dataset.minutes) === (t && isFocus ? t.duration / 60000 : state.minutes))); });
     document.querySelectorAll('[data-focus-mode]').forEach(el => { el.disabled = !!t; el.setAttribute('aria-pressed', String(el.dataset.focusMode === mode)); });
     if ($('focus-settings-open')) $('focus-settings-open').disabled = !!t;
-    if ($('pomodoro-progress')) $('pomodoro-progress').textContent = `累计完成 ${state.pomodoroCount} 次专注 · 每轮 ${state.preferences.cycles} 次`;
+    if ($('pomodoro-progress')) $('pomodoro-progress').textContent = `今日 ${C.todayTomatoes(state.sessions)} / ${state.preferences.dailyGoal} 番茄 · 累计完成 ${state.pomodoroCount} 次专注`;
     document.title = t ? `${$('timer-readout').textContent} · ${t.status === 'running' ? (isFocus ? '专注中' : '休息中') : '已暂停'} · 下一小步` : '下一小步 · 让想法慢慢发生';
     window.StepPages?.updateTimer();
+    window.StepFocus?.render(state);
   }
   function renderStats() {
     $('stat-steps').textContent = state.goals.reduce((n, g) => n + g.steps.filter(s => s.done).length, 0);
     $('stat-minutes').textContent = Math.floor(state.sessions.reduce((n, s) => n + s.seconds, 0) / 60);
+    $('stat-pomodoros').textContent = state.pomodoroCount;
     $('stat-goals').textContent = state.goals.filter(g => g.steps.length && g.steps.every(s => s.done)).length;
     const days = C.week(state.sessions), max = Math.max(60, ...days.map(d => d.seconds));
     $('week-total').textContent = `${Math.floor(days.reduce((n, d) => n + d.seconds, 0) / 60)} 分钟`;
@@ -126,9 +184,10 @@
     $('today-label').textContent = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }) + '  /  A FRESH START';
     return true;
   }
-  function render() { refreshDateHeading(); renderGoals(); renderSteps(); drawTimer(); renderStats(); window.StepPlanner?.render(state); window.StepWidgets?.sync(state); }
+  function render() { refreshDateHeading(); renderGoals(); renderSteps(); renderToday(); drawTimer(); renderStats(); window.StepPlanner?.render(state); window.StepWidgets?.sync(state); }
   function openGoal(id = null) { if (!id && state.goals.length >= 100) { toast('最多保留 100 个目标，请先整理已有目标。'); return; } editId = id; const g = state.goals.find(g => g.id === id); $('goal-form').reset(); $('goal-error').textContent = ''; $('goal-dialog-title').textContent = g ? '给目标一点调整。' : '你想让什么发生？'; $('goal-name').value = g?.title || ''; $('goal-reason').value = g?.why || ''; $('new-steps-fields').hidden = !!g; $('goal-dialog').showModal(); $('goal-name').focus(); }
   $('new-goal').onclick = () => openGoal(); $('empty-create').onclick = () => openGoal(); $('edit-goal').onclick = () => openGoal(state.selectedGoal);
+  $('today-add').onclick = () => addTask(C.dayKey(Date.now()));
   $('goal-form').onsubmit = e => {
     e.preventDefault(); const title = $('goal-name').value.trim(), why = $('goal-reason').value.trim(), lines = $('goal-steps').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     if (!title) { $('goal-error').textContent = '写一个目标名称再开始吧。'; return; }
@@ -142,14 +201,14 @@
   // Shared task editor: the calendar and goal list operate on the same steps.
   let taskEditing = null;
   const taskDialog = document.createElement('dialog'); taskDialog.id = 'task-dialog'; taskDialog.setAttribute('aria-labelledby', 'task-dialog-title');
-  taskDialog.innerHTML = '<form id="task-form"><div class="dialog-heading"><span class="eyebrow">ONE THING AT A TIME</span><button type="button" class="close-button" aria-label="关闭">×</button></div><h2 id="task-dialog-title">添加待办</h2><label for="task-title">要做什么</label><input id="task-title" maxlength="160" required><div id="task-group-field"><label for="task-group">归属目标</label><select id="task-group"></select></div><div class="form-grid"><div><label for="task-date">计划日期 <span class="optional">选填</span></label><input id="task-date" type="date" min="0001-01-01" max="9999-12-31"></div><div><label for="task-priority">优先级</label><select id="task-priority"><option value="normal">普通</option><option value="high">优先处理</option><option value="low">稍后再做</option></select></div></div><p class="form-error" id="task-error" role="alert"></p><button class="button primary" type="submit">保存待办</button></form>';
+  taskDialog.innerHTML = '<form id="task-form"><div class="dialog-heading"><span class="eyebrow">ONE THING AT A TIME</span><button type="button" class="close-button" aria-label="关闭">×</button></div><h2 id="task-dialog-title">添加待办</h2><label for="task-title">要做什么</label><input id="task-title" maxlength="160" required><div id="task-group-field"><label for="task-group">归属目标</label><select id="task-group"></select></div><div class="form-grid"><div><label for="task-date">计划日期 <span class="optional">选填</span></label><input id="task-date" type="date" min="0001-01-01" max="9999-12-31"></div><div><label for="task-priority">优先级</label><select id="task-priority"><option value="normal">普通</option><option value="high">优先处理</option><option value="low">稍后再做</option></select></div></div><label for="task-estimate">预计番茄数 <span class="optional">0 表示不预估，每段完整专注记 1 个</span></label><input id="task-estimate" type="number" min="0" max="12" step="1" inputmode="numeric" value="1"><p class="form-error" id="task-error" role="alert"></p><button class="button primary" type="submit">保存待办</button></form>';
   document.body.append(taskDialog); taskDialog.querySelector('.close-button').onclick = () => taskDialog.close();
   function openTask(goalId = null, stepId = null, date = null) {
     const goal = state.goals.find(g => g.id === goalId), step = goal?.steps.find(s => s.id === stepId);
     if (stepId && !step) return;
     taskEditing = step ? { goalId, stepId } : null;
     $('task-form').reset(); $('task-error').textContent = ''; $('task-dialog-title').textContent = step ? '编辑待办' : '添加待办';
-    $('task-title').value = step?.text || ''; $('task-date').value = step?.dueDate || (C.validDate(date) ? date : ''); $('task-priority').value = step?.priority || 'normal';
+    $('task-title').value = step?.text || ''; $('task-date').value = step?.dueDate || (C.validDate(date) ? date : ''); $('task-priority').value = step?.priority || 'normal'; $('task-estimate').value = step ? step.estimate : 1;
     $('task-group-field').hidden = !!step; $('task-group').replaceChildren();
     for (const g of state.goals) { const option = text('option', g.title); option.value = g.id; option.disabled = g.steps.length >= 100; $('task-group').append(option); }
     const daily = state.goals.find(g => g.title === '日常待办');
@@ -161,12 +220,12 @@
   function addTask(date = null) { openTask(null, null, date); }
   function editTask(goalId, stepId) { openTask(goalId, stepId); }
   $('task-form').onsubmit = e => {
-    e.preventDefault(); const value = $('task-title').value.trim(), date = $('task-date').value || null, priority = $('task-priority').value;
-    if (!value || value.length > 160 || (date !== null && !C.validDate(date)) || !['normal', 'high', 'low'].includes(priority)) { $('task-error').textContent = '请填写有效的任务名称、日期和优先级。'; return; }
+    e.preventDefault(); const value = $('task-title').value.trim(), date = $('task-date').value || null, priority = $('task-priority').value, estimate = Number($('task-estimate').value || 0);
+    if (!value || value.length > 160 || (date !== null && !C.validDate(date)) || !['normal', 'high', 'low'].includes(priority) || !Number.isInteger(estimate) || estimate < 0 || estimate > 12) { $('task-error').textContent = '请填写有效的任务名称、日期、优先级，以及 0–12 的预计番茄数。'; return; }
     if (taskEditing) {
       const goal = state.goals.find(g => g.id === taskEditing.goalId), step = goal?.steps.find(s => s.id === taskEditing.stepId);
       if (!step) { $('task-error').textContent = '这条任务已被移除，请关闭窗口后重试。'; return; }
-      step.text = value; step.dueDate = date; step.priority = priority;
+      step.text = value; step.dueDate = date; step.priority = priority; step.estimate = estimate;
     } else {
       let goal = state.goals.find(g => g.id === $('task-group').value);
       if (!goal) {
@@ -174,23 +233,23 @@
         goal = { id: C.id(), title: '日常待办', why: '', createdAt: Date.now(), steps: [] }; state.goals.push(goal);
       }
       if (goal.steps.length >= 100) { $('task-error').textContent = '这个目标已有 100 个行动，请换一个目标。'; return; }
-      const step = newStep(value, date, priority); goal.steps.push(step);
+      const step = newStep(value, date, priority, estimate); goal.steps.push(step);
       if (!state.timer) { state.selectedGoal = goal.id; state.selectedStep = step.id; }
     }
     save(); render(); taskDialog.close(); toast(taskEditing ? '待办已更新。' : '待办已添加。');
   };
   const settingsDialog = document.createElement('dialog'); settingsDialog.id = 'focus-settings-dialog'; settingsDialog.setAttribute('aria-labelledby', 'focus-settings-title');
-  settingsDialog.innerHTML = '<form id="focus-settings-form"><div class="dialog-heading"><span class="eyebrow">YOUR OWN RHYTHM</span><button type="button" class="close-button" aria-label="关闭">×</button></div><h2 id="focus-settings-title">番茄钟设置</h2><p class="muted">每段计时结束后，由你决定何时开始下一段。</p><div class="form-grid"><div><label for="settings-focus">专注 / 分钟</label><input id="settings-focus" type="number" min="5" max="180" step="1" required></div><div><label for="settings-cycles">每轮番茄数</label><input id="settings-cycles" type="number" min="2" max="8" step="1" required></div><div><label for="settings-short">短休息 / 分钟</label><input id="settings-short" type="number" min="1" max="60" step="1" required></div><div><label for="settings-long">长休息 / 分钟</label><input id="settings-long" type="number" min="1" max="60" step="1" required></div></div><p class="settings-note">完成一整段专注才计入番茄数；休息不计入专注时长。</p><p class="form-error" id="focus-settings-error" role="alert"></p><button class="button primary" type="submit">保存设置</button></form>';
+  settingsDialog.innerHTML = '<form id="focus-settings-form"><div class="dialog-heading"><span class="eyebrow">YOUR OWN RHYTHM</span><button type="button" class="close-button" aria-label="关闭">×</button></div><h2 id="focus-settings-title">番茄钟设置</h2><p class="muted">每段计时结束后，由你决定何时开始下一段。</p><div class="form-grid"><div><label for="settings-focus">专注 / 分钟</label><input id="settings-focus" type="number" min="5" max="180" step="1" required></div><div><label for="settings-cycles">每轮番茄数</label><input id="settings-cycles" type="number" min="2" max="8" step="1" required></div><div><label for="settings-short">短休息 / 分钟</label><input id="settings-short" type="number" min="1" max="60" step="1" required></div><div><label for="settings-long">长休息 / 分钟</label><input id="settings-long" type="number" min="1" max="60" step="1" required></div><div><label for="settings-daily">每日番茄目标</label><input id="settings-daily" type="number" min="1" max="24" step="1" required></div></div><p class="settings-note">完成一整段专注才计入番茄数；休息不计入专注时长，也不会增加番茄。</p><p class="form-error" id="focus-settings-error" role="alert"></p><button class="button primary" type="submit">保存设置</button></form>';
   document.body.append(settingsDialog); settingsDialog.querySelector('.close-button').onclick = () => settingsDialog.close();
   if ($('focus-settings-open')) $('focus-settings-open').onclick = () => {
     if (timerLocked()) return;
-    $('settings-focus').value = state.minutes; $('settings-cycles').value = state.preferences.cycles; $('settings-short').value = state.preferences.shortBreak; $('settings-long').value = state.preferences.longBreak; $('focus-settings-error').textContent = ''; settingsDialog.showModal(); $('settings-focus').focus();
+    $('settings-focus').value = state.minutes; $('settings-cycles').value = state.preferences.cycles; $('settings-short').value = state.preferences.shortBreak; $('settings-long').value = state.preferences.longBreak; $('settings-daily').value = state.preferences.dailyGoal; $('focus-settings-error').textContent = ''; settingsDialog.showModal(); $('settings-focus').focus();
   };
   $('focus-settings-form').onsubmit = e => {
     e.preventDefault(); if (timerLocked()) return;
-    const minutes = Number($('settings-focus').value), cycles = Number($('settings-cycles').value), shortBreak = Number($('settings-short').value), longBreak = Number($('settings-long').value);
-    if (![minutes, cycles, shortBreak, longBreak].every(Number.isInteger) || minutes < 5 || minutes > 180 || cycles < 2 || cycles > 8 || shortBreak < 1 || shortBreak > 60 || longBreak < 1 || longBreak > 60) { $('focus-settings-error').textContent = '专注为 5–180 分钟，休息为 1–60 分钟，每轮为 2–8 个番茄，请输入整数。'; return; }
-    state.minutes = minutes; state.preferences = { shortBreak, longBreak, cycles }; save(); render(); settingsDialog.close(); toast('已保存你的节奏。');
+    const minutes = Number($('settings-focus').value), cycles = Number($('settings-cycles').value), shortBreak = Number($('settings-short').value), longBreak = Number($('settings-long').value), dailyGoal = Number($('settings-daily').value);
+    if (![minutes, cycles, shortBreak, longBreak, dailyGoal].every(Number.isInteger) || minutes < 5 || minutes > 180 || cycles < 2 || cycles > 8 || shortBreak < 1 || shortBreak > 60 || longBreak < 1 || longBreak > 60 || dailyGoal < 1 || dailyGoal > 24) { $('focus-settings-error').textContent = '专注为 5–180 分钟，休息为 1–60 分钟，每轮为 2–8 个番茄，每日目标为 1–24 个番茄，请输入整数。'; return; }
+    state.minutes = minutes; state.preferences = { shortBreak, longBreak, cycles, dailyGoal, sound: state.preferences.sound, volume: state.preferences.volume }; save(); render(); settingsDialog.close(); toast('已保存你的节奏。');
   };
   if ($('focus-modes')) for (const [mode, label] of [['focus', '专注'], ['shortBreak', '短休息'], ['longBreak', '长休息']]) {
     const el = button(label, 'focus-mode', () => { if (timerLocked()) return; state.mode = mode; save(); drawTimer(); }); el.dataset.focusMode = mode; el.setAttribute('aria-pressed', 'false'); $('focus-modes').append(el);
@@ -209,11 +268,14 @@
   $('finish-step').onclick = () => { const g = getGoal(), s = getStep(); if (g && s) completeStep(g, s); };
   function tick() {
     const dayChanged = refreshDateHeading();
-    if (state.timer?.status === 'running' && C.remaining(state.timer) <= 0) { const end = state.timer.endsAt, result = settleSession(end); save(); render(); toast(result.kind === 'focus' ? `这一段专注已记下。准备好后，开始${state.mode === 'longBreak' ? '长' : '短'}休息。` : '休息结束了。选好下一件事，再开始专注。'); }
+    if (state.timer?.status === 'running' && C.remaining(state.timer) <= 0) {
+      const goal = state.goals.find(g => g.id === state.timer.goalId), endedStep = goal?.steps.find(s => s.id === state.timer.stepId), end = state.timer.endsAt, result = settleSession(end); save(); render();
+      toast(result.kind === 'focus' ? `这一段专注已记下${endedStep ? `，这是第 ${endedStep.pomodoros} 个番茄` : ''}。准备好后，开始${state.mode === 'longBreak' ? '长' : '短'}休息。` : '休息结束了。选好下一件事，再开始专注。');
+    }
     else {
       drawTimer();
       // Refresh date-dependent views once per day without resetting form drafts.
-      if (dayChanged) { renderSteps(); renderStats(); window.StepPlanner?.render(state); }
+      if (dayChanged) { renderSteps(); renderToday(); renderStats(); window.StepPlanner?.render(state); }
     }
   }
   function download(contents, name) {
@@ -263,5 +325,6 @@
   }
   window.StepApp = { getState: () => state, saveAndRender: () => { save(); render(); }, confirm: confirmAction, toast, completeStep, selectTask, editTask, addTask };
   window.StepPlanner?.init(window.StepApp);
+  window.StepFocus?.init(window.StepApp);
   render(); tick(); window.StepWidgets?.init(window.StepApp); setInterval(tick, 1000);
 })();

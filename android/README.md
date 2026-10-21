@@ -1,6 +1,6 @@
 # 下一小步 · Android
 
-这是将仓库 `dist/` 原样打包进 APK 的轻量 Android 应用。最低 Android 8.0（API 26），包名 `io.github.zyy051206.nextstep`。任务、计时和本机数据可离线使用；原生更新检查与下载需要网络权限。2.0.3 使用安装来源权限调起 Android 系统安装确认，不申请广泛存储或后台服务权限。2.1.0 增加系统通知与准时提醒权限，仅在用户主动选择时申请。
+这是将仓库 `dist/` 原样打包进 APK 的轻量 Android 应用。最低 Android 8.0（API 26），包名 `io.github.zyy051206.nextstep`。任务、计时和本机数据可离线使用；原生更新检查与下载需要网络权限。2.0.3 使用安装来源权限调起 Android 系统安装确认，不申请广泛存储或后台服务权限。2.1.0 增加系统通知与准时提醒权限，仅在用户主动选择时申请。2.2.0 增加桌面组件，2.3.0 增加待办番茄预估与自动计数、今日番茄清单、每日目标和沉浸专注模式。
 
 ## 安装与数据
 
@@ -32,6 +32,17 @@ APK 输出：`android/app/build/outputs/apk/debug/app-debug.apk` 与 `android/ap
 
 正式 APK 须使用 SDK 的 `apksigner` 和所有者的固定私有密钥签名，并运行 `apksigner verify --verbose` 验证；私钥和密码不能提交到仓库或公开产物。工作流提供同版本 `apksigner.jar` 方便在可信本机完成签名。
 
+在保存原始密钥的 Windows 账户上，可以运行仓库根目录的 `sign-android-release.ps1`。它会从仓库外的 `tmp/next-step-signing-private/` 读取 JKS 和 DPAPI 加密密码，在进程内完成签名，并检查原发布证书以及 v2/v3 签名。密码不会写入明文文件。示例：
+
+```powershell
+.\sign-android-release.ps1 `
+  -UnsignedApk .\android\app\build\outputs\apk\release\app-release-unsigned.apk `
+  -ApkSignerJar .\android\artifacts\apksigner.jar `
+  -OutputApk .\app-release-signed.apk
+```
+
+若使用其他构建产物，将参数改成对应的 unsigned APK 和 `apksigner.jar` 路径。输出文件已经存在时脚本会停止，避免覆盖。
+
 ## 验证
 
 工作流先构建与 Android Lint，再启动 API 35 模拟器，用真实 Android WebView 运行 `connectedDebugAndroidTest`：检查离线页面与原生桥加载、Activity 重建后的进度、背景图片与图标颜色持久化、图片和备份选择器筛选，以及系统返回先关闭网页对话框。更新测试覆盖版本、发布元数据和 GitHub SHA-256 要求、真实下载流的大小/哈希/取消、缓存被修改、APK 包名与版本号及证书比较、受限 FileProvider 安装 Intent，以及原生状态恢复和未下载时禁止安装。测试构造安装 Intent，不在用户设备上执行测试安装。测试通过后才上传同一次构建的 unsigned release、debug APK、签名工具和 SHA-256；另上传检查报告。模拟器测试使用 debug APK，正式包仍需完成签名校验和安装验收。
@@ -47,6 +58,10 @@ APK 输出：`android/app/build/outputs/apk/debug/app-debug.apk` 与 `android/ap
 元数据优先来自固定仓库的 HTTPS API；失败时尝试该仓库最新正式发布的 android-update.json。API 禁止重定向，备用资源仅允许已列出的 HTTPS 下载域名。下载起始地址精确匹配该仓库、标签与 APK 文件名；重定向仅允许明确列出的 GitHub HTTPS 下载主机，限制跳转次数、等待时间及 512 MiB 文件上限。要求发布资产提供 SHA-256，并核对流的实际字节数、SHA-256、APK 包名、递增的 versionCode、versionName 和当前应用签名。每次安装以及恢复缓存都重新验证；校验失败不能启动安装。FileProvider 只暴露 `cache/updates/install/`，不暴露业务数据、背景图或更新元数据，安装 Intent 仅授予临时读取权限。网页不能指定网络地址或文件路径。
 
 相关接口依据：[Android 网络连接](https://developer.android.com/reference/java/net/HttpURLConnection)、[FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)、[应用安装来源权限](https://developer.android.com/reference/android/content/pm/PackageManager#canRequestPackageInstalls())、[签名信息](https://developer.android.com/reference/android/content/pm/SigningInfo)、[GitHub 最新发布接口](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。
+
+## 番茄待办与沉浸专注（2.3.0）
+
+待办的番茄预估、实际计数、每日目标和沉浸模式都沿用网页版本，无需新的原生权限。白噪音由 WebView 的 WebAudio 在本地合成，不请求网络、不读取媒体文件；需要用户点击进入沉浸模式后才能开始播放。安卓的省电策略可能在锁屏后暂停音频，回到应用会按计时状态恢复显示；计时本身仍按实际时钟计算。
 
 ## 桌面组件（2.2.0）
 
