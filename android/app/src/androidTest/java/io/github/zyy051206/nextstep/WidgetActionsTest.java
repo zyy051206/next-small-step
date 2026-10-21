@@ -40,7 +40,7 @@ public class WidgetActionsTest {
             evaluate(scenario,"localStorage.setItem(StepCore.key,JSON.stringify(StepCore.initial()));location.reload()");
             await(scenario,"test reset reload","document.readyState==='complete' && performance.timeOrigin!=="+oldTimeOrigin);
             await(scenario,"empty test state","typeof StepApp==='object' && document.readyState==='complete' && StepApp.getState().goals.length===0");
-            evaluate(scenario,"{const s=StepApp.getState();s.goals=[{id:'widget-goal',title:'桌面测试',why:'',createdAt:Date.now(),steps:[{id:'widget-step',text:'真实待办',done:false,completedAt:null,dueDate:StepCore.dayKey(Date.now()),priority:'normal'}]}];s.selectedGoal='widget-goal';s.selectedStep='widget-step';StepApp.saveAndRender();}");
+            evaluate(scenario,"{const s=StepApp.getState();s.goals=[{id:'widget-goal',title:'桌面测试',why:'',createdAt:Date.now(),steps:[{id:'widget-step',text:'真实待办',done:false,completedAt:null,dueDate:StepCore.dayKey(Date.now()),priority:'normal',estimate:0,pomodoros:0}]}];s.selectedGoal='widget-goal';s.selectedStep='widget-step';StepApp.saveAndRender();}");
             await(scenario,"fixture saved","StepApp.getState().selectedGoal==='widget-goal' && StepApp.getState().selectedStep==='widget-step'");
             JSONObject start=new JSONObject().put("action","start").put("page","workspace").put("kind","focus").put("goalId","widget-goal").put("stepId","widget-step").put("endsAt",0);
             command(scenario,start);
